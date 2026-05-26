@@ -1,0 +1,320 @@
+/* 全局变量和重置 */
+:root {
+    --bg-color: #FFF9E6; /* 奶油黄背景 */
+    --text-color: #333333; /* 炭黑色文字 */
+    --pink-accent: #FF879A; /* 爱心/计时器粉色 */
+    --orange-accent: #FF8F6B; /* 导航激活色 */
+    --border-style: 3px solid #2D2D2D; /* 粗黑描边 */
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box; /* 【修复】之前误写成了 border-style，改成 border-box 网页排版会更精准稳定 */
+}
+
+body {
+    background-color: var(--bg-color);
+    color: var(--text-color);
+    font-family: 'ZCOOL KuaiLe', cursive, sans-serif;
+    background-image: radial-gradient(#FFDAB9 1.5px, transparent 1.5px);
+    background-size: 40px 40px; 
+    padding-bottom: 60px; /* 底部留出一些空白，避免太贴边 */
+    min-height: 100vh;
+}
+
+/* 核心容器：把最大宽度从 600px 扩大到 720px，给横向更多空间 */
+.container {
+    max-width: 720px;
+    margin: 0 auto;
+    padding: 30px 24px;
+}
+
+/* 核心通用样式：硬边阴影卡片 */
+.box-shadow {
+    box-shadow: 6px 6px 0px var(--pink-accent);
+}
+
+.card {
+    background-color: white;
+    border: var(--border-style);
+    border-radius: 20px; /* 圆角稍微加大一点，显得更圆润可爱 */
+    padding: 24px;       /* 【扩大】加大卡片内部的留白 */
+    margin-bottom: 40px; /* 【扩大】加大卡片与卡片之间的上下距离 */
+}
+
+.section-title {
+    font-size: 20px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 20px; /* 【扩大】标题和下面内容的间距 */
+}
+
+.section-title img {
+    width: 26px;
+}
+
+/* 1. 顶部导航栏 */
+.nav-bar {
+    background-color: white;
+    border: var(--border-style);
+    border-radius: 50px;
+    padding: 12px 28px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 50px; /* 【扩大】导航栏和下方计时器的间距 */
+    margin-top: 10px;
+    box-shadow: 0 4px 0px rgba(0,0,0,0.05);
+}
+
+.user-avatars-small {
+    display: flex;
+    align-items: center;
+}
+
+/* 让两个小头像微微重开，更有亲密感 */
+.avatar-small {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    border: 3px solid white;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.avatar-small:last-child {
+    margin-left: -12px; 
+}
+
+.nav-links {
+    display: flex;
+    gap: 14px; /* 【扩大】导航按钮之间的间距 */
+}
+
+.nav-btn {
+    text-decoration: none;
+    color: var(--text-color);
+    padding: 8px 18px;
+    border-radius: 20px;
+    font-size: 15px;
+    font-weight: bold;
+    transition: 0.2s;
+    border: 2px solid transparent;
+}
+
+.nav-btn.active {
+    background-color: var(--orange-accent);
+    color: white;
+    border-color: var(--orange-accent);
+}
+
+/* 2. 双头像计时器区域 */
+.love-timer-section {
+    text-align: center;
+    margin-bottom: 50px; /* 【扩大】与下方纪念日的间距 */
+}
+
+.timer-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 35px; /* 【引入】用固定的间距拉开两只小狗与中间文字的距离 */
+}
+
+.timer-puppy {
+    width: 100px; /* 略微放大一点小狗 */
+    height: 100px;
+    object-fit: contain;
+}
+
+.timer-content {
+    min-width: 180px;
+}
+
+.timer-title {
+    font-size: 18px;
+    color: #666;
+    letter-spacing: 1px;
+}
+
+.timer-days {
+    font-size: 46px; /* 放大数字，突出视觉焦点 */
+    font-weight: bold;
+    color: var(--pink-accent);
+    margin: 5px 0;
+}
+
+.timer-date {
+    font-size: 13px;
+    color: #888;
+}
+
+/* 3. 纪念日卡片 */
+.anniversary-section {
+    margin-bottom: 45px;
+}
+
+.anniversary-details {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 5px 10px;
+}
+
+.ann-item {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.ann-item img {
+    width: 48px;
+    height: 48px;
+}
+
+.ann-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.ann-countdown {
+    font-size: 14px;
+    color: #666;
+}
+
+.progress-bar {
+    width: 160px; /* 加宽进度条 */
+    height: 12px;
+    background-color: #F0F0F0;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid #2D2D2D; /* 给进度条也加上线条小狗风格的黑边 */
+}
+
+.progress-fill {
+    height: 100%;
+    background-color: var(--orange-accent);
+}
+
+/* 4. 快速入口卡片网格 */
+.quick-links-section {
+    margin-bottom: 45px;
+}
+
+.links-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px; /* 【扩大】加大四个方块之间的间隙 */
+}
+
+.link-item {
+    text-align: center;
+    padding: 18px 10px; /* 增加上下留白 */
+}
+
+.link-item img {
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    border: var(--border-style);
+    background-color: white;
+    margin-bottom: 8px;
+}
+
+.link-title {
+    font-size: 15px;
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+
+.link-sub {
+    font-size: 11px;
+    color: #888;
+}
+
+/* 5. 照片展示流卡格 */
+.links-grid-photos {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 24px; /* 【扩大】加大两张拍立得照片之间的间距 */
+}
+
+.photo-card {
+    display: flex;
+    flex-direction: column;
+    padding: 16px; /* 拍立得相框的内边距 */
+}
+
+.photo-main {
+    width: 100%;
+    border: var(--border-style);
+    border-radius: 14px;
+}
+
+.photo-caption {
+    font-size: 13px;
+    margin-top: 14px;
+    color: #444;
+    line-height: 1.4;
+}
+
+/* ==================== 动态小狗爪子样式 ==================== */
+.cursor-paw {
+    position: absolute;
+    width: 24px;
+    height: 20px;
+    pointer-events: none; /* 让爪子不挡住鼠标点击 */
+    z-index: 9999; /* 确保爪子在最上层显示 */
+    animation: pawFadeOut 1s forwards ease-out; /* 1秒淡出动画 */
+    
+    /* 粉色掌心大肉垫 */
+    background: #FF879A; 
+    border-radius: 50% 50% 45% 45% / 40% 40% 60% 60%;
+}
+
+/* 粉色小脚趾 */
+.cursor-paw::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: -2px;
+    width: 28px;
+    height: 10px;
+    /* 巧妙利用虚线边框画出 4 个独立的粉色脚趾点点 */
+    border-top: 6px dotted #FF879A; 
+    border-radius: 50%;
+}
+
+/* 爪子从出生到消失的淡出动画 */
+@keyframes pawFadeOut {
+    0% {
+        opacity: 0.9;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+    100% {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(1.2); /* 慢慢变大一点点然后消失 */
+    }
+}
+
+/* 优化快速入口的 HTML 标签改变后的样式 */
+a.link-item {
+    text-decoration: none; /* 去除原本的下划线 */
+    color: inherit;        /* 继承原本的炭黑色文字颜色 */
+    display: flex;         /* 保持卡片内部布局稳定 */
+    flex-direction: column;
+    align-items: center;
+    cursor: pointer;       /* 鼠标放上去时变成小手图标 */
+}
+
+.links-grid .link-item {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* 鼠标移上去时，卡片往左上角微微浮起，硬边阴影加深 */
+.links-grid .link-item:hover {
+    transform: translate(-4px, -4px);
+    box-shadow: 10px 10px 0px var(--pink-accent);
+}
