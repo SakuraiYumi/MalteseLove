@@ -23,7 +23,7 @@
             </div>
         </nav>
 
-        <p class="section-title">📸 珍藏的时光碎片</p>
+        <!-- <p class="section-title">📸 珍藏的时光碎片</p>
         <section class="links-grid-photos">
             <div class="photo-card card box-shadow">
                 <img src="images/photo_travel.png" alt="照片1" class="photo-main">
@@ -42,6 +42,17 @@
                 <p class="photo-caption">📍 跨年夜倒数时偷偷拍的你</p>
             </div>
         </section>
+        <section class="card box-shadow">
+    <p class="section-title"><img src="https://img.icons8.com/emoji/48/000000/star-emoji.png" alt="icon"> 丢进回忆库</p> -->
+    
+    <div style="display: flex; flex-direction: column; gap: 10px;">
+        <input type="text" id="mem-input-url" placeholder="粘贴图片链接 (可使用 Pinterest 或网图链接)" style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit;">
+        <input type="text" id="mem-input-caption" placeholder="写下一句浪漫的文字描述..." style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit;">
+        <button id="add-mem-btn" style="background-color: var(--pink-accent); color: white; border: 2px solid #2D2D2D; padding: 8px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D;">挂上照片墙 🖼️</button>
+    </div>
+</section>
+
+<section class="photo-stream-section links-grid-photos" id="memory-list"></section>
     </div>
     <script src="script.js"></script>
 </body>

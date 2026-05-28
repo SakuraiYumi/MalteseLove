@@ -22,7 +22,7 @@
                 <a href="memory.html" class="nav-btn">回忆</a>
             </div>
         </nav>
-
+<!-- 
         <section class="card box-shadow">
             <p class="section-title">📆 那些闪闪发光的日子</p>
             
@@ -42,7 +42,18 @@
                     <p style="font-size: 14px; color: #888; margin-top: 4px;">农历2月25和新历11月10日，每年的大日子 · 要一起吃全宇宙最好吃的蛋糕！</p>
                 </div>
             </div>
-        </section>
+        </section> -->
+            <section class="card box-shadow">
+        <p class="section-title"><img src="https://img.icons8.com/emoji/48/000000/calendar-emoji.png" alt="icon"> 纪念日规划局</p>
+        
+        <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 3px solid #2D2D2D;">
+            <input type="text" id="ann-input-title" placeholder="输入纪念日名称（如：认识1000天 🎉）" style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit;">
+            <input type="date" id="ann-input-date" style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit;">
+            <button id="add-ann-btn" style="background-color: var(--orange-accent); color: white; border: 2px solid #2D2D2D; padding: 8px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D;">定格这个日子 📌</button>
+        </div>
+
+        <div id="anniversary-list"></div>
+    </section>
     </div>
     <script src="script.js"></script>
 </body>

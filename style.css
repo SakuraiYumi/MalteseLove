@@ -318,3 +318,76 @@ a.link-item {
     transform: translate(-4px, -4px);
     box-shadow: 10px 10px 0px var(--pink-accent);
 }
+
+/* ==================== 📱 移动端自适应响应式布局 ==================== */
+@media (max-width: 550px) {
+    
+    /* 1. 缩小网页左右两侧的留白，给手机屏幕腾出更多空间 */
+    .container {
+        padding: 15px 14px;
+    }
+
+    /* 2. 导航栏优化：防止小头像和 5 个按钮横向挤扁，改为上下两层排列 */
+    .nav-bar {
+        flex-direction: column;
+        gap: 12px;
+        padding: 12px;
+        border-radius: 24px;
+    }
+    .nav-links {
+        gap: 4px;        /* 稍微缩短按钮之间的间距 */
+        flex-wrap: wrap; /* 允许在极小屏手机上自动换行 */
+        justify-content: center;
+    }
+    .nav-btn {
+        padding: 6px 12px;
+        font-size: 13px; /* 稍微缩小导航按钮字体 */
+    }
+
+    /* 3. 恋爱计时器优化：缩小两只小狗和文字，防止横向溢出 */
+    .timer-container {
+        gap: 15px; /* 缩短小狗与文字的距离 */
+    }
+    .timer-puppy {
+        width: 65px; /* 线条小狗从 100px 缩小到 65px */
+        height: 65px;
+    }
+    .timer-days {
+        font-size: 36px; /* 恋爱天数数字略微缩小 */
+    }
+    .timer-title {
+        font-size: 15px;
+    }
+
+    /* 4. 纪念日卡片优化：从“左右并排”变成“上下错开”，进度条完美撑满 */
+    .anniversary-details {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
+    .progress-bar {
+        width: 100%; /* 进度条不再固定宽度，而是优雅地撑满整张卡片 */
+    }
+
+    /* 5. 快速入口方块优化：从原本的【横排4列】变成【2×2两列网格】，文字再也不会重叠 */
+    .links-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .link-item {
+        padding: 14px 8px;
+    }
+    .link-item img {
+        width: 46px; /* 稍微缩小方块里的图标 */
+        height: 46px;
+    }
+    .link-title {
+        font-size: 14px;
+    }
+
+    /* 6. 拍立得相册优化：从【横排2列】变成【单列大图排列】，在手机上看超舒服 */
+    .links-grid-photos {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+}

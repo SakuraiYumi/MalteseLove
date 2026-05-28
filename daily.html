@@ -24,9 +24,15 @@
         </nav>
 
         <section class="card box-shadow">
-            <p class="section-title">🐱 碎碎念日记流</p>
-            <p style="padding: 20px 0; color: #666;">（在这里写下你们每天的可爱日常吧...）</p>
-        </section>
+                    <p class="section-title">🐱 碎碎念日记流</p>
+                    
+                    <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 3px solid #2D2D2D;">
+                        <textarea id="diary-input" placeholder="在这写下今天的可爱日常吧..." style="width: 100%; height: 80px; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit; resize: none;"></textarea>
+                        <button id="add-diary-btn" style="background-color: var(--pink-accent); color: white; border: 2px solid #2D2D2D; padding: 8px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D;">丢进小狗日记本 🐾</button>
+                    </div>
+
+                    <div id="diary-list"></div>
+                </section>
     </div>
     <script src="script.js"></script>
 </body>
