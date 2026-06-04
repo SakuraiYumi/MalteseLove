@@ -1,106 +1,120 @@
-// ==================== 1. 核心运行环境检查 & 初始化 ====================
-document.addEventListener('DOMContentLoaded', () => {
-    updateTimer();
-    updateAnniversary();
-    loadDiaries();
-    loadAnniversaries();
-    loadMemories();
-    loadWishes(); // 自动加载心愿清单
-});
+// ==================== 【防御层 1】小狗爪特效强制启动 ====================
+(function() {
+    // 检查是否已经初始化过，防止重复加载报错
+    if (window.hasPawEffectLoaded) return;
+    window.hasPawEffectLoaded = true;
+
+    document.addEventListener('mousemove', function(e) {
+        if (Math.random() > 0.15) return; 
+        const paw = document.createElement('div');
+        paw.className = 'cursor-paw';
+        paw.style.left = e.pageX + 'px';
+        paw.style.top = e.pageY + 'px';
+        const randomDegree = Math.floor(Math.random() * 40) - 20; 
+        paw.style.transform = `translate(-50%, -50%) rotate(${randomDegree}deg)`;
+        document.body.appendChild(paw);
+        setTimeout(() => paw.remove(), 1000);
+    });
+    console.log("🐾 小狗爪特效注入成功！");
+})();
 
 // 通用删除按钮样式
 const deleteBtnStyle = "background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold; float: right;";
 
+// ==================== 【防御层 2】连接云端大脑（改名为 supabaseClient 避让） ====================
+const supabaseUrl = 'https://ekaeienirogrgkjxvwtc.supabase.co';
+const supabaseKey = 'sb_publishable_mLKLqxXbN75bhUnSxkkA5w_4mwKr0rQ'; 
 
-// ==================== 2. 恋爱计时器 ====================
-function updateTimer() {
+let supabaseClient = null;
+
+try {
+    if (window.supabase) {
+        // 使用官方的 window.supabase 来创建我们的客户端
+        supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
+        console.log("☁️ 云端大脑连接成功，名字已安全避让！");
+    } else {
+        console.warn("🐾 小狗提示：未检测到三方 Supabase 核心库，云端暂未开启。");
+    }
+} catch (error) {
+    console.error("❌ 初始化错误:", error);
+}
+
+// ==================== 【防御层 3】页面长好后排队执行 ====================
+document.addEventListener('DOMContentLoaded', () => {
+    // 1. 恋爱计时器
     const daysElement = document.getElementById('days');
     if (daysElement) {
-        const startDate = new Date(2025, 5, 22); // 2025年06月22日
-        const now = new Date();
-        const difference = now - startDate;
-        const days = Math.floor(difference / (1000 * 60 * 60 * 24));
-        daysElement.innerText = days;
+        const updateTimer = () => {
+            const startDate = new Date(2025, 5, 22); 
+            const now = new Date();
+            daysElement.innerText = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
+        };
+        updateTimer();
+        setInterval(updateTimer, 1000 * 60 * 60 * 24);
     }
-}
-if (document.getElementById('days')) {
-    setInterval(updateTimer, 1000 * 60 * 60 * 24);
-}
 
-
-// ==================== 3. 小狗爪子特效 ====================
-document.addEventListener('mousemove', function(e) {
-    if (Math.random() > 0.15) return; 
-    const paw = document.createElement('div');
-    paw.className = 'cursor-paw';
-    paw.style.left = e.pageX + 'px';
-    paw.style.top = e.pageY + 'px';
-    const randomDegree = Math.floor(Math.random() * 40) - 20; 
-    paw.style.transform = `translate(-50%, -50%) rotate(${randomDegree}deg)`;
-    document.body.appendChild(paw);
-    setTimeout(() => { paw.remove(); }, 1000);
-});
-
-
-// ==================== 4. 主页一周年倒计时 ====================
-function updateAnniversary() {
+    // 2. 一周年倒计时
     const countdownElement = document.getElementById('ann-countdown');
     if (countdownElement) {
         const targetDate = new Date('2026-06-22T00:00:00'); 
         const now = new Date();
         const difference = targetDate - now;
-        if (difference > 0) {
-            const daysLeft = Math.ceil(difference / (1000 * 60 * 60 * 24));
-            countdownElement.innerText = `还有 ${daysLeft} 天`;
-        } else {
-            countdownElement.innerText = "就是今天！🎉";
-        }
+        countdownElement.innerText = difference > 0 ? `还有 ${Math.ceil(difference / (1000 * 60 * 60 * 24))} 天` : "就是今天！🎉";
     }
-}
 
+    // 3. 动态加载列表
+    if (supabaseClient) {
+        if (document.getElementById('diary-list')) loadDiaries();
+        if (document.getElementById('anniversary-list')) loadAnniversaries();
+        if (document.getElementById('memory-list')) loadMemories();
+        if (document.getElementById('wish-list')) loadWishes(); 
+    } else {
+        ['diary-list', 'anniversary-list', 'memory-list', 'wish-list'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.innerHTML = '<p style="text-align:center; color:#ff879a;">云端未连接，本地特效守护中 🐾</p>';
+        });
+    }
+});
 
-// ==================== 5. 日常记录页功能 (daily.html) ====================
-function loadDiaries() {
+// ==================== 4. 日常记录功能 ====================
+async function loadDiaries() {
     const list = document.getElementById('diary-list');
-    if (!list) return;
-    const data = JSON.parse(localStorage.getItem('my_diaries')) || [];
+    if (!list || !supabaseClient) return;
+    list.innerHTML = '<p style="text-align:center; color:#888;">正在从云端读取日记... ☁️</p>'; 
+    const { data, error } = await supabaseClient.from('diaries').select('*').order('id', { ascending: false });
+    if (error) return console.error(error);
     list.innerHTML = ''; 
-    data.slice().reverse().forEach((item, index) => {
-        const realIndex = data.length - 1 - index; 
+    data.forEach(item => {
         const div = document.createElement('div');
         div.style.cssText = "border-bottom: 2px dashed #FF879A; padding: 15px 0; text-align: left; overflow: hidden;";
-        div.innerHTML = `
-            <button onclick="deleteItem('my_diaries', ${realIndex}, loadDiaries)" style="${deleteBtnStyle}">删除 ✖</button>
-            <p style="font-size: 13px; color: #888;">${item.date} 🐾</p>
-            <p style="font-size: 16px; color: #333; margin-top: 6px;">${item.text}</p>
-        `;
+        div.innerHTML = `<button onclick="deleteItem('diaries', ${item.id}, loadDiaries)" style="${deleteBtnStyle}">删除 ✖</button><p style="font-size: 13px; color: #888;">${item.date} 🐾</p><p style="font-size: 16px; color: #333; margin-top: 6px;">${item.text}</p>`;
         list.appendChild(div);
     });
 }
 const addDiaryBtn = document.getElementById('add-diary-btn');
 if (addDiaryBtn) {
-    addDiaryBtn.addEventListener('click', function() {
-        const diaryInput = document.getElementById('diary-input');
-        const text = diaryInput.value.trim();
+    addDiaryBtn.addEventListener('click', async function() {
+        if (!supabaseClient) return alert('云端未连接');
+        const input = document.getElementById('diary-input');
+        const text = input.value.trim();
         if (!text) return alert('内容不能为空哦！');
         const now = new Date();
         const dateString = `${now.getFullYear()}年${String(now.getMonth() + 1).padStart(2, '0')}月${String(now.getDate()).padStart(2, '0')}日`;
-        const data = JSON.parse(localStorage.getItem('my_diaries')) || [];
-        data.push({ text: text, date: dateString });
-        localStorage.setItem('my_diaries', JSON.stringify(data));
-        diaryInput.value = '';
+        input.value = '正在飞往云端... 🕊️'; input.disabled = true;
+        await supabaseClient.from('diaries').insert([{ text: text, date: dateString }]);
+        input.value = ''; input.disabled = false;
         loadDiaries();
     });
 }
 
-
-// ==================== 6. 纪念日规划页功能 (anniversary.html) ====================
-function loadAnniversaries() {
+// ==================== 5. 纪念日规划功能 ====================
+async function loadAnniversaries() {
     const list = document.getElementById('anniversary-list');
-    if (!list) return;
-    const data = JSON.parse(localStorage.getItem('my_anniversaries')) || [];
+    if (!list || !supabaseClient) return;
+    const { data, error } = await supabaseClient.from('anniversaries').select('*').order('date', { ascending: true });
+    if (error) return console.error(error);
     list.innerHTML = '';
-    data.forEach((item, index) => {
+    data.forEach(item => {
         const targetDate = new Date(item.date + 'T00:00:00');
         const now = new Date();
         const diff = targetDate - now;
@@ -108,75 +122,57 @@ function loadAnniversaries() {
         const div = document.createElement('div');
         div.className = "anniversary-details";
         div.style.cssText = "border-bottom: 2px dashed #2D2D2D; padding: 15px 0; margin-bottom: 5px;";
-        div.innerHTML = `
-            <div class="ann-item">
-                <img src="https://i.pinimg.com/736x/b2/4b/ab/b24babcb8298538e26c2425b699402a2.jpg" alt="icon">
-                <div class="text" style="text-align:left;">
-                    <p class="ann-title">${item.title}</p>
-                    <p class="ann-countdown" style="color: #666; font-size:14px;">目标日: ${item.date} (${countdownText})</p>
-                </div>
-            </div>
-            <button onclick="deleteItem('my_anniversaries', ${index}, loadAnniversaries)" style="${deleteBtnStyle} margin-top: 10px;">删除 ✖</button>
-        `;
+        div.innerHTML = `<div class="ann-item"><img src="https://i.pinimg.com/736x/b2/4b/ab/b24babcb8298538e26c2425b699402a2.jpg" alt="icon"><div class="text" style="text-align:left;"><p class="ann-title">${item.title}</p><p class="ann-countdown" style="color: #666; font-size:14px;">目标日: ${item.date} (${countdownText})</p></div></div><button onclick="deleteItem('anniversaries', ${item.id}, loadAnniversaries)" style="${deleteBtnStyle} margin-top: 10px;">删除 ✖</button>`;
         list.appendChild(div);
     });
 }
 const addAnnBtn = document.getElementById('add-ann-btn');
 if (addAnnBtn) {
-    addAnnBtn.addEventListener('click', () => {
+    addAnnBtn.addEventListener('click', async () => {
+        if (!supabaseClient) return alert('云端未连接');
         const titleInput = document.getElementById('ann-input-title');
         const dateInput = document.getElementById('ann-input-date');
         if (!titleInput.value.trim() || !dateInput.value) return alert('请填全纪念日名称和日期！');
-        const data = JSON.parse(localStorage.getItem('my_anniversaries')) || [];
-        data.push({ title: titleInput.value.trim(), date: dateInput.value });
-        localStorage.setItem('my_anniversaries', JSON.stringify(data));
+        await supabaseClient.from('anniversaries').insert([{ title: titleInput.value.trim(), date: dateInput.value }]);
         titleInput.value = ''; dateInput.value = '';
         loadAnniversaries();
     });
 }
 
-
-// ==================== 7. 回艺相册页功能 (memory.html) ====================
-function loadMemories() {
+// ==================== 6. 回艺相册功能 ====================
+async function loadMemories() {
     const list = document.getElementById('memory-list');
-    if (!list) return;
-    const data = JSON.parse(localStorage.getItem('my_memories')) || [];
+    if (!list || !supabaseClient) return;
+    const { data, error } = await supabaseClient.from('memories').select('*').order('id', { ascending: false });
+    if (error) return console.error(error);
     list.innerHTML = '';
-    data.forEach((item, index) => {
+    data.forEach(item => {
         const div = document.createElement('div');
         div.className = "photo-card card box-shadow";
-        div.innerHTML = `
-            <img src="${item.url}" alt="回忆" class="photo-main" onerror="this.src='https://i.pinimg.com/736x/6e/a6/ad/6ea6ad6c307fd568b2379c20df95760e.jpg'">
-            <p class="photo-caption" style="text-align: left; position: relative;">
-                ${item.caption}
-                <button onclick="deleteItem('my_memories', ${index}, loadMemories)" style="${deleteBtnStyle} float: right; margin-top: -5px;">删除 ✖</button>
-            </p>
-        `;
+        div.innerHTML = `<img src="${item.url}" alt="回忆" class="photo-main" onerror="this.src='https://i.pinimg.com/736x/6e/a6/ad/6ea6ad6c307fd568b2379c20df95760e.jpg'"><p class="photo-caption" style="text-align: left; position: relative;">${item.caption}<button onclick="deleteItem('memories', ${item.id}, loadMemories)" style="${deleteBtnStyle} float: right; margin-top: -5px;">删除 ✖</button></p>`;
         list.appendChild(div);
     });
 }
 const addMemBtn = document.getElementById('add-mem-btn');
 if (addMemBtn) {
-    addMemBtn.addEventListener('click', () => {
+    addMemBtn.addEventListener('click', async () => {
+        if (!supabaseClient) return alert('云端未连接');
         const urlInput = document.getElementById('mem-input-url');
         const capInput = document.getElementById('mem-input-caption');
         let url = urlInput.value.trim() || "https://i.pinimg.com/736x/6e/a6/ad/6ea6ad6c307fd568b2379c20df95760e.jpg"; 
-        const data = JSON.parse(localStorage.getItem('my_memories')) || [];
-        data.push({ url: url, caption: capInput.value.trim() || "未命名美好瞬间" });
-        localStorage.setItem('my_memories', JSON.stringify(data));
+        await supabaseClient.from('memories').insert([{ url: url, caption: capInput.value.trim() || "未命名美好瞬间" }]);
         urlInput.value = ''; capInput.value = '';
         loadMemories();
     });
 }
 
-
-// ==================== 8. 心愿清单页功能 (wish.html) ====================
-function loadWishes() {
+// ==================== 7. 心愿清单功能 ====================
+async function loadWishes() {
     const list = document.getElementById('wish-list');
-    if (!list) return;
-
-    // 如果本地完全没有心愿数据，就用你原本的 5 个心愿作为初始值
-    if (!localStorage.getItem('my_wishes')) {
+    if (!list || !supabaseClient) return;
+    const { data, error } = await supabaseClient.from('wishes').select('*').order('id', { ascending: true });
+    if (error) return console.error(error);
+    if (data.length === 0) {
         const defaultWishes = [
             { text: "razem 一起去海边看日出 🌅", checked: true },
             { text: "养一只属于我们的小狗 🐶", checked: true },
@@ -184,64 +180,42 @@ function loadWishes() {
             { text: "狂吃一整条街的夜市小吃 🍡", checked: false },
             { text: "一起通宵拼完一千块的拼图 🧩", checked: false }
         ];
-        localStorage.setItem('my_wishes', JSON.stringify(defaultWishes));
+        await supabaseClient.from('wishes').insert(defaultWishes);
+        return loadWishes(); 
     }
-
-    const data = JSON.parse(localStorage.getItem('my_wishes')) || [];
     list.innerHTML = '';
-
-    data.forEach((item, index) => {
+    data.forEach(item => {
         const div = document.createElement('div');
         div.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 5px 0;";
-        
-        // 根据是否勾选，动态决定文字颜色
         const textColor = item.checked ? "#666" : "#333";
-        const textDecoration = item.checked ? "line-through" : "none"; // 勾选的可以加条删除线，不想要可以删掉这一行
-
-        div.innerHTML = `
-            <label style="display: flex; align-items: center; cursor: pointer; color: ${textColor}; text-decoration: ${textDecoration}; flex: 1;">
-                <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleWish(${index})" style="transform: scale(1.3); margin-right: 10px; accent-color: #FF879A;">
-                <span>${item.text}</span>
-            </label>
-            <button onclick="deleteItem('my_wishes', ${index}, loadWishes)" style="${deleteBtnStyle} float: none; margin-left: 10px;">删除 ✖</button>
-        `;
+        const textDecoration = item.checked ? "line-through" : "none"; 
+        div.innerHTML = `<label style="display: flex; align-items: center; cursor: pointer; color: ${textColor}; text-decoration: ${textDecoration}; flex: 1;"><input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleWish(${item.id}, ${item.checked})" style="transform: scale(1.3); margin-right: 10px; accent-color: #FF879A;"><span>${item.text}</span></label><button onclick="deleteItem('wishes', ${item.id}, loadWishes)" style="${deleteBtnStyle} float: none; margin-left: 10px;">删除 ✖</button>`;
         list.appendChild(div);
     });
 }
-
-// 勾选或取消勾选心愿时，改变状态并保存
-window.toggleWish = function(index) {
-    const data = JSON.parse(localStorage.getItem('my_wishes')) || [];
-    if (data[index]) {
-        data[index].checked = !data[index].checked; // 状态反转
-        localStorage.setItem('my_wishes', JSON.stringify(data));
-        loadWishes(); // 重新渲染样式
-    }
+window.toggleWish = async function(id, currentStatus) {
+    if (!supabaseClient) return;
+    await supabaseClient.from('wishes').update({ checked: !currentStatus }).eq('id', id);
+    loadWishes(); 
 }
-
 const addWishBtn = document.getElementById('add-wish-btn');
 if (addWishBtn) {
-    addWishBtn.addEventListener('click', () => {
+    addWishBtn.addEventListener('click', async () => {
+        if (!supabaseClient) return alert('云端未连接');
         const input = document.getElementById('wish-input');
         const text = input.value.trim();
-        if (!text) return alert('心愿不能为空哦，快写下一个浪漫的点子吧！');
-
-        const data = JSON.parse(localStorage.getItem('my_wishes')) || [];
-        data.push({ text: text, checked: false }); // 新增的心愿默认是未完成(false)
-        localStorage.setItem('my_wishes', JSON.stringify(data));
-        
+        if (!text) return alert('心愿不能为空哦！');
+        await supabaseClient.from('wishes').insert([{ text: text, checked: false }]);
         input.value = '';
         loadWishes();
     });
 }
 
-
-// ==================== 9. 统一全局小狗橡皮擦 ====================
-window.deleteItem = function(storageKey, index, reloadFunction) {
+// ==================== 8. 全局小狗橡皮擦 ====================
+window.deleteItem = async function(tableName, id, reloadFunction) {
+    if (!supabaseClient) return;
     if (confirm('小狗提示：确定要擦除这条珍贵的数据吗？')) {
-        const data = JSON.parse(localStorage.getItem(storageKey)) || [];
-        data.splice(index, 1); 
-        localStorage.setItem(storageKey, JSON.stringify(data)); 
+        await supabaseClient.from(tableName).delete().eq('id', id);
         reloadFunction(); 
     }
 }
