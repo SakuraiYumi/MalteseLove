@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小狗美食探店 🍔</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-bar">
+            <div class="user-avatars-small">
+                <img src="https://i.pinimg.com/736x/1e/c6/4c/1ec64c28cbce99261f09741f21722619.jpg" alt="小狗 A" class="avatar-small">
+                <img src="https://i.pinimg.com/736x/ab/e5/4b/abe54be077392cc5792ba49568955c56.jpg" alt="小狗 B" class="avatar-small">
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-btn">首页</a>
+                <a href="daily.html" class="nav-btn">日常</a>
+                <a href="anniversary.html" class="nav-btn">纪念日</a>
+                <a href="wish.html" class="nav-btn">心愿</a>
+                <a href="food.html" class="nav-btn active">美食</a>
+            </div>
+        </nav>
+
+        <section class="search-section" style="margin-top: 15px;">
+            <input type="text" id="search-food" placeholder="🔍 搜索店名、地点（如：夫子庙）或评价..." oninput="searchFood()" style="width: 100%; padding: 12px; border: 2px solid #2D2D2D; border-radius: 12px; font-family: inherit; font-size: 14px; box-shadow: 2px 2px 0 #2D2D2D;">
+        </section>
+
+        <section class="card box-shadow" style="margin-top: 20px;">
+            <p class="section-title"><img src="https://img.icons8.com/emoji/48/000000/hamburger-emoji.png" alt="icon"> 记录新探店</p>
+            <div id="stats-bar" style="text-align: center; margin: 10px 0; font-weight: bold; color: #FF879A;">
+                ✨ 你们已经打卡了 <span id="food-count">0</span> 家店！
+            </div>
+
+<input type="date" id="food-input-date" style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit;">
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="file" id="food-input-file" accept="image/*" style="display: none;" onchange="previewImage(this)">
+                    <label for="food-input-file" style="background-color: #FF879A; color: white; border: 2px solid #2D2D2D; padding: 10px 20px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; font-size: 14px;">📷 上传美食照片</label>
+                    
+                    <div id="image-preview-container" style="display: none; width: 60px; height: 60px; border: 2px solid #2D2D2D; border-radius: 10px; overflow: hidden; background: white;">
+                        <img id="image-preview" src="" alt="预览" style="width: 100%; height: 100%; object-fit: cover;">
+                    </div>
+                </div>
+
+                <input type="text" id="food-input-name" placeholder="🏷️ 店铺名称 (如：隔壁老王烧烤)" style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit;">
+                <input type="text" id="food-input-location" placeholder="📍 探店地点 (如：新街口/金虹路)" style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit;">
+                
+                <select id="food-input-rating" style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit; background: white; font-size: 14px;">
+                    <option value="⭐⭐⭐⭐⭐ 绝赞推荐！">⭐⭐⭐⭐⭐ 绝赞推荐！</option>
+                    <option value="⭐⭐⭐⭐ 挺好好吃">⭐⭐⭐⭐ 挺好吃的</option>
+                    <option value="⭐⭐⭐ 一般般啦">⭐⭐⭐ 一般般啦</option>
+                    <option value="⭐⭐ 避雷！">⭐⭐ 避雷！</option>
+                    <option value="⭐ 狗都不吃">⭐ 狗都不吃</option>
+                </select>
+
+                <textarea id="food-input-comment" placeholder="📝 写下你们的干饭评价..." style="width: 100%; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit; resize: none; height: 60px; font-size: 14px;"></textarea>
+
+                <button id="add-food-btn" style="background-color: #2D2D2D; color: white; border: 2px solid #2D2D2D; padding: 12px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #FF879A; font-size: 16px;">收录进美食局 🍔</button>
+            </div>
+        </section>
+
+        <section class="photo-stream-section links-grid-photos" id="food-list" style="margin-top: 20px;">
+            </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script>
+</body>
+</html>
