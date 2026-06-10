@@ -7,10 +7,10 @@
     document.addEventListener('mousemove', function(e) {
         if (Math.random() > 0.15) return; 
         const paw = document.createElement('div');
+        const randomDegree = Math.floor(Math.random() * 40) - 20; 
         paw.className = 'cursor-paw';
         paw.style.left = e.pageX + 'px';
         paw.style.top = e.pageY + 'px';
-        const randomDegree = Math.floor(Math.random() * 40) - 20; 
         paw.style.transform = `translate(-50%, -50%) rotate(${randomDegree}deg)`;
         document.body.appendChild(paw);
         setTimeout(() => paw.remove(), 1000);
@@ -21,15 +21,18 @@
 // 通用删除按钮样式
 const deleteBtnStyle = "background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold; float: right;";
 
-// ==================== 【防御层 2】连接云端大脑（改名为 supabaseClient 避让） ====================
+// ==================== 【防御层 2】连接云端大脑 ====================
 const supabaseUrl = 'https://ekaeienirogrgkjxvwtc.supabase.co';
 const supabaseKey = 'sb_publishable_mLKLqxXbN75bhUnSxkkA5w_4mwKr0rQ'; 
 
 let supabaseClient = null;
 
+// 新增美食全局状态变量，用来做无刷新本地筛选和编辑图片暂存
+let allFoods = []; 
+let currentImageUrl = ""; 
+
 try {
     if (window.supabase) {
-        // 使用官方的 window.supabase 来创建我们的客户端
         supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
         console.log("☁️ 云端大脑连接成功，名字已安全避让！");
     } else {
@@ -62,11 +65,16 @@ document.addEventListener('DOMContentLoaded', () => {
         countdownElement.innerText = difference > 0 ? `还有 ${Math.ceil(difference / (1000 * 60 * 60 * 24))} 天` : "就是今天！🎉";
     }
 
-// 3. 动态加载列表
+    // 3. 美食页面特有：自动将探店日历初始化为今天
+    const foodDateInput = document.getElementById('food-input-date');
+    if (foodDateInput) {
+        foodDateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // 4. 动态加载各个页面的列表数据
     if (supabaseClient) {
         if (document.getElementById('diary-list')) loadDiaries();
         if (document.getElementById('anniversary-list')) loadAnniversaries();
-        // === 修改这里：把 memory 换成 food ===
         if (document.getElementById('food-list')) loadFoods();
         if (document.getElementById('wish-list')) loadWishes(); 
     } else {
@@ -140,10 +148,9 @@ if (addAnnBtn) {
     });
 }
 
-// ==================== 6. 美食探店功能（本地上传+地点+检索） ====================
+// ==================== 6. 美食探店功能 (超级重构升级版) ====================
 
 // --- 6.1：图片预览小魔法 ---
-// 这个函数在 HTML 里通过 onchange 调用，负责把手机里选的照片先显示在网页上预览
 window.previewImage = function(input) {
     const previewContainer = document.getElementById('image-preview-container');
     const previewImage = document.getElementById('image-preview');
@@ -152,27 +159,54 @@ window.previewImage = function(input) {
     if (file) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            previewImage.src = e.target.result; // 将读取的图片内容塞给预览图
-            previewContainer.style.display = 'block'; // 显示预览区域
+            previewImage.src = e.target.result;
+            previewContainer.style.display = 'block';
         }
-        reader.readAsDataURL(file); // 读取图片文件
+        reader.readAsDataURL(file);
     } else {
-        previewContainer.style.display = 'none'; // 如果没选，就隐藏预览区域
+        if(!currentImageUrl) {
+            previewContainer.style.display = 'none';
+        }
     }
 }
 
-// --- 6.2：从云端加载美食数据（增加了地点显示和检索） ---
-async function loadFoods(searchQuery = '') {
+// --- 6.2：从云端下载美食数据 ---
+async function loadFoods() {
     const list = document.getElementById('food-list');
     if (!list || !supabaseClient) return;
     
-    // 查询时，同时也查出刚才新建的 'location' 列
-    const { data, error } = await supabaseClient.from('memories').select('id, url, caption, location').order('id', { ascending: false });
+    list.innerHTML = '<p style="text-align:center; color:#888; width:100%;">正在加载美食库... ☁️</p>';
+    
+    // 下载全部数据，包含新加的 location 和 visit_date
+    const { data, error } = await supabaseClient
+        .from('memories')
+        .select('id, url, caption, location, visit_date')
+        .order('id', { ascending: false });
+        
     if (error) return console.error(error);
     
+    // 将数据存入全局数组，方便本地搜索和编辑回填
+    allFoods = data || [];
+    
+    // 渲染数据并更新打卡总店数统计
+    const countEl = document.getElementById('food-count');
+    if (countEl) countEl.innerText = allFoods.length;
+    
+    renderFoodList(allFoods);
+}
+
+// 核心渲染器：将卡片渲染到 HTML 中
+function renderFoodList(foodsArray) {
+    const list = document.getElementById('food-list');
+    if (!list) return;
     list.innerHTML = '';
-    data.forEach(item => {
-        // 1. 魔法解包：拆解店名、评分和评价
+    
+    if (foodsArray.length === 0) {
+        list.innerHTML = '<p style="text-align:center; color:#999; width:100%; padding:20px;">🔍 没有找到相关的探店记录哦~</p>';
+        return;
+    }
+
+    foodsArray.forEach(item => {
         let name = "未命名记忆", rating = "", comment = item.caption;
         if (item.caption && item.caption.includes('||')) {
             const parts = item.caption.split('||');
@@ -181,108 +215,202 @@ async function loadFoods(searchQuery = '') {
             comment = parts[2] || '';
         }
 
-        // 2. 获取数据库里原本的地点（如果没有填，就给一个默认的📍未知）
         let location = item.location || '未知';
-
-        // 3. 实时检索逻辑：如果输入了搜索词，且店名、评价、地点里都没有这个词，就隐藏卡片
-        if (searchQuery) {
-            const searchLower = searchQuery.toLowerCase();
-            const isInName = name.toLowerCase().includes(searchLower);
-            const isInComment = comment.toLowerCase().includes(searchLower);
-            const isInLocation = location.toLowerCase().includes(searchLower); // 新增：地点检索
-            
-            if (!isInName && !isInComment && !isInLocation) {
-                return; // 跳过这条数据
-            }
-        }
+        let showDate = item.visit_date || '未知日期';
 
         const div = document.createElement('div');
         div.className = "photo-card card box-shadow";
-        div.style.cssText = "display: flex; flex-direction: column; overflow: hidden; background: white;";
+        div.style.cssText = "display: flex; flex-direction: column; overflow: hidden; background: white; position: relative;";
         
         div.innerHTML = `
             <img src="${item.url}" alt="美食照片" class="photo-main" style="width:100%; height:150px; object-fit:cover; border-bottom: 2px solid #2D2D2D;" onerror="this.src='https://i.pinimg.com/736x/84/4c/02/844c02c8639038d394ccb7af8e7b74ba.jpg'">
-            <div style="padding: 12px; text-align: left; position: relative;">
+            <div style="padding: 12px; text-align: left; padding-bottom: 45px;">
                 <h3 style="margin: 0 0 5px 0; color: #FF4D4D; font-size: 16px;">${name}</h3>
-                
-                <p style="margin: 0 0 5px 0; font-size: 12px; color: #555;">📍 ${location}</p>
-                
+                <div style="display:flex; justify-content:space-between; font-size:12px; color:#555; margin-bottom: 5px;">
+                    <span>📍 ${location}</span>
+                    <span>📅 ${showDate}</span>
+                </div>
                 <p style="margin: 0 0 8px 0; font-size: 12px;">${rating}</p>
-                <p style="margin: 0; font-size: 14px; color: #555; line-height: 1.4;">${comment}</p>
-                <button onclick="deleteItem('memories', ${item.id}, loadFoods)" style="${deleteBtnStyle} position: absolute; right: 10px; bottom: 10px;">删除 ✖</button>
+                <p style="margin: 0; font-size: 14px; color: #555; line-height: 1.4; word-break: break-all;">${comment}</p>
+                
+                <div style="position: absolute; right: 10px; bottom: 10px; display: flex; gap: 5px;">
+                    <button onclick="startEdit(${item.id})" style="background: #ECECEC; color: #2D2D2D; border: 2px solid #2D2D2D; padding: 2px 8px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold; font-family: inherit;">✏️ 编辑</button>
+                    <button onclick="deleteItem('memories', ${item.id}, loadFoods)" style="background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 8px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold; font-family: inherit;">✖</button>
+                </div>
             </div>
         `;
         list.appendChild(div);
     });
 }
 
-// 绑定搜索框实时触发
+// --- 6.3：双重本地实时筛选功能（店名/地点/评价 + 日期） ---
 window.searchFood = function() {
-    const query = document.getElementById('search-food').value.trim();
-    loadFoods(query);
+    const textKeyword = document.getElementById('search-food').value.toLowerCase().trim();
+    const dateKeyword = document.getElementById('search-date').value;
+
+    const filtered = allFoods.filter(item => {
+        let name = "未命名记忆", rating = "", comment = item.caption || "";
+        if (item.caption && item.caption.includes('||')) {
+            const parts = item.caption.split('||');
+            name = parts[0];
+            rating = parts[1];
+            comment = parts[2] || '';
+        }
+        const location = item.location || '未知';
+        const visitDate = item.visit_date || '';
+
+        // 1. 文字关键字过滤（对比店名、地点、评价内容）
+        const matchesText = 
+            name.toLowerCase().includes(textKeyword) ||
+            comment.toLowerCase().includes(textKeyword) ||
+            location.toLowerCase().includes(textKeyword);
+        
+        // 2. 日期日历过滤（若没选日期，则默认放行所有）
+        const matchesDate = !dateKeyword || (visitDate === dateKeyword);
+
+        return matchesText && matchesDate;
+    });
+
+    renderFoodList(filtered);
 }
 
-// --- 6.3：添加新探店（核心：上传图片+存地点+存其他信息） ---
+// --- 6.4：触发编辑状态：将数据抓回输入框 ---
+window.startEdit = function(id) {
+    const item = allFoods.find(f => f.id == id);
+    if (!item) return;
+
+    let name = "未命名记忆", rating = "⭐⭐⭐⭐⭐ 绝赞推荐！", comment = item.caption;
+    if (item.caption && item.caption.includes('||')) {
+        const parts = item.caption.split('||');
+        name = parts[0];
+        rating = parts[1];
+        comment = parts[2] || '';
+    }
+
+    // 1. 回填各个表单
+    document.getElementById("editing-id").value = item.id;
+    document.getElementById("food-input-name").value = name;
+    document.getElementById("food-input-location").value = item.location || "";
+    document.getElementById("food-input-rating").value = rating;
+    document.getElementById("food-input-comment").value = comment;
+    if(item.visit_date) {
+        document.getElementById("food-input-date").value = item.visit_date;
+    }
+
+    // 2. 记住原来的旧照片链接，进行显示预览
+    currentImageUrl = item.url;
+    const previewImg = document.getElementById("image-preview");
+    const previewContainer = document.getElementById("image-preview-container");
+    previewImg.src = item.url;
+    previewContainer.style.display = "block";
+
+    // 3. 改变外观按钮提示，展示取消按钮
+    document.getElementById("form-title").innerHTML = `✏️ 正在修改：${name}`;
+    document.getElementById("add-food-btn").innerText = "保存修改 💾";
+    document.getElementById("cancel-edit-btn").style.display = "block";
+
+    // 4. 丝滑滚动到最顶端，方便修改
+    document.getElementById("form-title").scrollIntoView({ behavior: 'smooth' });
+}
+
+// 重置并退出编辑表单状态
+window.resetForm = function() {
+    document.getElementById("editing-id").value = "";
+    document.getElementById("food-input-name").value = "";
+    document.getElementById("food-input-location").value = "";
+    document.getElementById("food-input-comment").value = "";
+    document.getElementById("food-input-file").value = "";
+    document.getElementById("image-preview-container").style.display = "none";
+    document.getElementById("image-preview").src = "";
+    currentImageUrl = "";
+
+    // 重置日历为今天
+    document.getElementById("food-input-date").value = new Date().toISOString().split('T')[0];
+
+    // 恢复按钮和标题
+    document.getElementById("form-title").innerHTML = `<img src="https://img.icons8.com/emoji/48/000000/hamburger-emoji.png" alt="icon"> 记录新探店`;
+    document.getElementById("add-food-btn").innerText = "收录进美食局 🍔";
+    document.getElementById("cancel-edit-btn").style.display = "none";
+}
+
+// --- 6.5：添加与保存修改复合提交功能 ---
 const addFoodBtn = document.getElementById('add-food-btn');
 if (addFoodBtn) {
     addFoodBtn.addEventListener('click', async () => {
         if (!supabaseClient) return alert('云端未连接');
         
+        const editingId = document.getElementById('editing-id').value;
         const nameInput = document.getElementById('food-input-name');
-        const locationInput = document.getElementById('food-input-location'); // 地点输入框
+        const locationInput = document.getElementById('food-input-location'); 
         const ratingInput = document.getElementById('food-input-rating');
-        const fileInput = document.getElementById('food-input-file'); // 文件输入框
+        const fileInput = document.getElementById('food-input-file'); 
         const commentInput = document.getElementById('food-input-comment');
+        const dateInput = document.getElementById('food-input-date');
         
-        // 1. 基础验证
         let name = nameInput.value.trim();
         let location = locationInput.value.trim();
         let comment = commentInput.value.trim();
+        let visitDate = dateInput.value;
         let file = fileInput.files[0];
         
         if (!name) return alert('店名不能为空哦！');
-        if (!location) return alert('📍 给探店局加个地点吧（如：夫子庙）！');
+        if (!location) return alert('📍 给探店局加个地点吧！');
         if (!comment) return alert('随便写点干饭评价吧汪~');
-        if (!file) return alert('📷 请上传一张诱人的美食照片吧！汪！');
-
-        // 按钮变灰提示上传中，防止重复点击
-        addFoodBtn.innerText = "上传照片并收录中... 🕊️";
-        addFoodBtn.disabled = true;
-
-        // 2. 超核心动作：上传图片到 Supabase Storage
-        // 生成一个唯一的文件名（时间戳 + 原文件名），防止文件冲突
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;     
-        // 执行上传动作，飞去 '干饭局照片' 存储桶
-        const { data: uploadData, error: uploadError } = await supabaseClient.storage.from('Food').upload(fileName, file);
-
-        if (uploadError) {
-            addFoodBtn.innerText = "收录进美食局 🍔";
-            addFoodBtn.disabled = false;
-            console.error(uploadError);
-            return alert('❌ 上传照片到云端抽屉失败，检查一下 Bucket 设置或者网速吧。');
+        if (!visitDate) return alert('📅 别忘了选择探店日期哦！');
+        
+        // 如果是新增记录，而且没有选照片，强行拦截
+        if (!editingId && !file) {
+            return alert('📷 请上传一张诱人的美食照片吧！汪！');
         }
 
-        // 3. 上传成功，获取它的全网公开访问链接
-        const { data: { publicUrl } } = supabaseClient.storage.from('Food').getPublicUrl(fileName);
+        addFoodBtn.innerText = editingId ? "正在保存修改... 💾" : "上传照片并收录中... 🕊️";
+        addFoodBtn.disabled = true;
 
-        // 4. 将所有信息（公开图片链接、魔法打包评价、地点）存入 memories 数据库
-        // 魔法打包：依然用 "||" 隔开
-        let combinedCaption = `${name}||${ratingInput.value}||${comment}`;
-        
-        await supabaseClient.from('memories').insert([{ 
-            url: publicUrl, // 公开链接
-            caption: combinedCaption, // 店名+评分+评价
-            location: location // 地点（新列）
-        }]);
-        
-        // 5. 恢复初始状态
-        nameInput.value = ''; locationInput.value = ''; commentInput.value = ''; fileInput.value = '';
-        document.getElementById('image-preview-container').style.display = 'none'; // 隐藏预览
-        addFoodBtn.innerText = "收录进美食局 🍔";
-        addFoodBtn.disabled = false;
-        
-        loadFoods();
+        let finalImageUrl = currentImageUrl; // 如果是编辑状态且未换照片，默认继续用老图
+
+        try {
+            // 如果选了新照片，则启动云端抽屉重命名上传
+            if (file) {
+                const fileExt = file.name.split('.').pop();
+                const fileName = `${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;     
+                const { data: uploadData, error: uploadError } = await supabaseClient.storage.from('Food').upload(fileName, file);
+
+                if (uploadError) throw uploadError;
+
+                const { data: { publicUrl } } = supabaseClient.storage.from('Food').getPublicUrl(fileName);
+                finalImageUrl = publicUrl;
+            }
+
+            // 魔法数据组装
+            let combinedCaption = `${name}||${ratingInput.value}||${comment}`;
+            const dbData = { 
+                url: finalImageUrl, 
+                caption: combinedCaption, 
+                location: location,
+                visit_date: visitDate
+            };
+
+            if (editingId) {
+                // 【更新分支】
+                const { error: updateError } = await supabaseClient.from('memories').update(dbData).eq('id', editingId);
+                if (updateError) throw updateError;
+                alert('🎉 修改成功！美食记录已悄悄更新！');
+            } else {
+                // 【新增分支】
+                const { error: insertError } = await supabaseClient.from('memories').insert([dbData]);
+                if (insertError) throw insertError;
+                alert('🍔 成功收录进美食局！小狗奖励你一根骨头！');
+            }
+            
+            resetForm();
+            loadFoods();
+        } catch (uploadError) {
+            console.error(uploadError);
+            alert('❌ 操作失败，请检查云端设置、Bucket策略或网速。');
+        } finally {
+            addFoodBtn.innerText = "收录进美食局 🍔";
+            addFoodBtn.disabled = false;
+        }
     });
 }
 
