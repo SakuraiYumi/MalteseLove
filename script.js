@@ -20,7 +20,6 @@
 const deleteBtnStyle = "background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold; float: right;";
 
 // ==================== 【防御层 2】连接云端大脑 ====================
-// !!! 记住保持你的秘钥 !!!
 const supabaseUrl = 'https://ekaeienirogrgkjxvwtc.supabase.co';
 const supabaseKey = 'sb_publishable_mLKLqxXbN75bhUnSxkkA5w_4mwKr0rQ'; 
 
@@ -30,7 +29,7 @@ let supabaseClient = null;
 let allFoods = []; 
 let currentImageUrl = ""; 
 let isImageRemoved = false; 
-let currentSelectedTag = 'All'; // 新增：当前选中的标签分类
+let currentSelectedTag = 'All'; 
 
 try {
     if (window.supabase) {
@@ -42,10 +41,11 @@ try {
 
 // ==================== 【防御层 3】页面长好后排队执行 ====================
 document.addEventListener('DOMContentLoaded', () => {
+    // 1. 恋爱天数计算
     const daysElement = document.getElementById('days');
     if (daysElement) {
         const updateTimer = () => {
-            const startDate = new Date(2025, 5, 22); 
+            const startDate = new Date(2025, 5, 22); // 2025年6月22日 (5代表6月)
             const now = new Date();
             daysElement.innerText = Math.floor((now - startDate) / (1000 * 60 * 60 * 24));
         };
@@ -53,6 +53,7 @@ document.addEventListener('DOMContentLoaded', () => {
         setInterval(updateTimer, 1000 * 60 * 60 * 24);
     }
 
+    // 2. 最近纪念日大看板倒计时
     const countdownElement = document.getElementById('ann-countdown');
     if (countdownElement) {
         const targetDate = new Date('2026-06-22T00:00:00'); 
@@ -61,16 +62,22 @@ document.addEventListener('DOMContentLoaded', () => {
         countdownElement.innerText = difference > 0 ? `还有 ${Math.ceil(difference / (1000 * 60 * 60 * 24))} 天` : "就是今天！🎉";
     }
 
+    // 3. 探店日期默认今天
     const foodDateInput = document.getElementById('food-input-date');
     if (foodDateInput) {
         foodDateInput.value = new Date().toISOString().split('T')[0];
     }
 
+    // 4. 加载所有云端数据
     if (supabaseClient) {
         if (document.getElementById('diary-list')) loadDiaries();
         if (document.getElementById('anniversary-list')) loadAnniversaries();
         if (document.getElementById('food-list')) loadFoods();
         if (document.getElementById('wish-list')) loadWishes(); 
+    } else {
+        // 如果云端没连上，把主页的“正在计算”改成提示，方便排查
+        const annList = document.getElementById('anniversary-list');
+        if (annList) annList.innerHTML = "<p style='color:orange; text-align:center;'>☁️ 等待云端组件加载中...</p>";
     }
 });
 
@@ -88,6 +95,7 @@ async function loadDiaries() {
         list.appendChild(div);
     });
 }
+
 const addDiaryBtn = document.getElementById('add-diary-btn');
 if (addDiaryBtn) {
     addDiaryBtn.addEventListener('click', async function() {
@@ -102,23 +110,115 @@ if (addDiaryBtn) {
     });
 }
 
-// ==================== 5. 纪念日规划功能 ====================
+// ==================== 5. 纪念日规划功能 (🌟 智能倒计时核心修复) ====================
+
+// ⚙️ 内部辅助工具：智能倒计时大脑
+function calculateSmartCountdown(dateStr, isYearly) {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // 抹平时间误差
+
+    // 格式化传入的目标日期
+    const targetDate = new Date(dateStr + 'T00:00:00');
+    if (isNaN(targetDate.getTime())) return "日期格式有误";
+
+    if (!isYearly) {
+        // 【单次日子】比如认识1000天
+        const diffTime = targetDate - today;
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        if (diffDays === 0) return "✨ 就是今天！ ✨";
+        if (diffDays > 0) return `还有 <span style="color:#E76F51; font-weight:bold;">${diffDays}</span> 天`;
+        return `已过去 <span style="color:#888;">${Math.abs(diffDays)}</span> 天`;
+    } else {
+        // 【每年重复】比如生日、结婚纪念日
+        const currentYear = today.getFullYear();
+        let nextOccur = new Date(currentYear, targetDate.getMonth(), targetDate.getDate());
+        
+        // 如果今年的生日/纪念日已经过去了，自动计算明年的
+        if (nextOccur < today) {
+            nextOccur.setFullYear(currentYear + 1);
+        }
+
+        const diffTime = nextOccur - today;
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        const totalYears = nextOccur.getFullYear() - targetDate.getFullYear();
+
+        if (diffDays === 0) {
+            return `🎉 <span style="color:#E76F51; font-weight:bold;">今天正日子！${totalYears}周年</span> 🎉`;
+        } else if (diffDays === 1) {
+            return `🎂 <span style="color:#F4A261; font-weight:bold;">明天就是啦！</span> 🎂`;
+        } else {
+            return `还有 <span style="color:#E76F51; font-weight:bold;">${diffDays}</span> 天 (第${totalYears}年)`;
+        }
+    }
+}
+
 async function loadAnniversaries() {
     const list = document.getElementById('anniversary-list');
     if (!list || !supabaseClient) return;
-    const { data, error } = await supabaseClient.from('anniversaries').select('*').order('date', { ascending: true });
-    if (error) return console.error(error);
+
+    // 🐾 只要一进函数，立刻把“正在计算...”刷掉，防止卡死显示
+    list.innerHTML = '<p style="text-align:center; color:#888;">正在同步纪念日清单... 🚀</p>';
+
+    const { data, error } = await supabaseClient.from('anniversaries').select('*');
+    if (error) {
+        list.innerHTML = '<p style="text-align:center; color:red;">加载失败了...</p>';
+        return console.error(error);
+    }
+    
+    if (!data || data.length === 0) {
+        list.innerHTML = '<p style="text-align:center; color:#888;">目前还没有纪念日哦汪~</p>';
+        return;
+    }
+
+    // 智能化排序：让快到的日子排在前面
+    const sortedData = data.map(item => {
+        // 临时算一下还有几天，用来做本地排序
+        const today = new Date();
+        today.setHours(0,0,0,0);
+        const tDate = new Date(item.date + 'T00:00:00');
+        let daysLeft = 9999;
+        if(tDate && !isNaN(tDate.getTime())) {
+            if(item.is_yearly) {
+                let next = new Date(today.getFullYear(), tDate.getMonth(), tDate.getDate());
+                if(next < today) next.setFullYear(today.getFullYear() + 1);
+                daysLeft = Math.round((next - today) / (1000*60*60*24));
+            } else {
+                daysLeft = Math.ceil((tDate - today) / (1000*60*60*24));
+                if(daysLeft < 0) daysLeft = 5000 + Math.abs(daysLeft); // 已过去的单次日子靠后排
+            }
+        }
+        return { ...item, daysLeft };
+    }).sort((a, b) => a.daysLeft - b.daysLeft);
+
     list.innerHTML = '';
-    data.forEach(item => {
-        const diff = new Date(item.date + 'T00:00:00') - new Date();
-        let countdownText = diff > 0 ? `还有 ${Math.ceil(diff / (1000 * 60 * 60 * 24))} 天` : "就是今天/已过去 🎉";
+    sortedData.forEach(item => {
+        // 调用我们上方缝合的【智能倒计时大脑】
+        const countdownText = calculateSmartCountdown(item.date, item.is_yearly);
+        
         const div = document.createElement('div');
         div.className = "anniversary-details";
-        div.style.cssText = "border-bottom: 2px dashed #2D2D2D; padding: 15px 0; margin-bottom: 5px;";
-        div.innerHTML = `<div class="ann-item"><img src="https://i.pinimg.com/736x/b2/4b/ab/b24babcb8298538e26c2425b699402a2.jpg" alt="icon"><div class="text" style="text-align:left;"><p class="ann-title">${item.title}</p><p class="ann-countdown" style="color: #666; font-size:14px;">目标日: ${item.date} (${countdownText})</p></div></div><button onclick="deleteItem('anniversaries', ${item.id}, loadAnniversaries)" style="${deleteBtnStyle} margin-top: 10px;">删除 ✖</button>`;
+        div.style.cssText = "border-bottom: 2px dashed #2D2D2D; padding: 15px 0; margin-bottom: 5px; overflow: hidden;";
+        div.innerHTML = `
+            <div class="ann-item" style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <img src="https://i.pinimg.com/736x/b2/4b/ab/b24babcb8298538e26c2425b699402a2.jpg" alt="icon" style="width:40px; height:40px; border-radius:50%;">
+                    <div class="text" style="text-align:left;">
+                        <p class="ann-title" style="margin:0; font-weight:bold; color:#2D2D2D;">${item.title}</p>
+                        <p style="margin:4px 0 0 0; color: #888; font-size:12px;">
+                            📅 初始日: ${item.date} ${item.is_yearly ? '<span style="color:#2A9D8F;">[每年过]</span>' : '<span style="color:#E76F51;">[过一次]</span>'}
+                        </p>
+                    </div>
+                </div>
+                <div style="text-align:right; font-weight:bold; font-size:14px;">
+                    ${countdownText}
+                </div>
+            </div>
+            <button onclick="deleteItem('anniversaries', ${item.id}, loadAnniversaries)" style="${deleteBtnStyle} margin-top: 5px;">删除 ✖</button>
+        `;
         list.appendChild(div);
     });
 }
+
 const addAnnBtn = document.getElementById('add-ann-btn');
 if (addAnnBtn) {
     addAnnBtn.addEventListener('click', async () => {
@@ -132,8 +232,7 @@ if (addAnnBtn) {
     });
 }
 
-// ==================== 6. 美食探店功能 (终极完全体：含标签分类) ====================
-
+// ==================== 6. 美食探店功能 ====================
 const noImagePlaceholder = "https://i.pinimg.com/736x/84/4c/02/844c02c8639038d394ccb7af8e7b74ba.jpg";
 
 window.previewImage = function(input) {
@@ -169,21 +268,12 @@ window.removeEditImage = function() {
 async function loadFoods() {
     const list = document.getElementById('food-list');
     if (!list || !supabaseClient) return;
-    
     list.innerHTML = '<p style="text-align:center; color:#888; width:100%;">正在加载美食库... ☁️</p>';
-    
-    const { data, error } = await supabaseClient
-        .from('memories')
-        .select('id, url, caption, location, visit_date')
-        .order('id', { ascending: false });
-        
+    const { data, error } = await supabaseClient.from('memories').select('id, url, caption, location, visit_date').order('id', { ascending: false });
     if (error) return console.error(error);
-    
     allFoods = data || [];
     const countEl = document.getElementById('food-count');
     if (countEl) countEl.innerText = allFoods.length;
-    
-    // 初始化渲染（应用当前可能存在的搜索词和标签）
     searchFood();
 }
 
@@ -191,47 +281,40 @@ function renderFoodList(foodsArray) {
     const list = document.getElementById('food-list');
     if (!list) return;
     list.innerHTML = '';
-    
     if (foodsArray.length === 0) {
         list.innerHTML = '<p style="text-align:center; color:#999; width:100%; padding:20px;">🔍 没有找到相关的探店记录哦~</p>';
         return;
     }
-
     foodsArray.forEach(item => {
-        // 魔法解包：店名||评分||评价||标签
         let name = "未命名记忆", rating = "", comment = "", tag = "🍽️ 未分类";
         if (item.caption && item.caption.includes('||')) {
             const parts = item.caption.split('||');
             name = parts[0];
             rating = parts[1];
             comment = parts[2] || '';
-            tag = parts[3] || '🍽️ 未分类'; // 老数据没有标签，默认归为未分类
+            tag = parts[3] || '🍽️ 未分类';
         } else {
             comment = item.caption;
         }
-
         let location = item.location || '未知地点';
         let showDate = item.visit_date || '未知日期';
 
         const div = document.createElement('div');
         div.className = "photo-card card box-shadow";
         div.style.cssText = "display: flex; flex-direction: column; overflow: hidden; background: white; position: relative;";
-        
         div.innerHTML = `
-            <img src="${item.url}" alt="美食照片" class="photo-main" style="width:100%; height:150px; object-fit:cover; border-bottom: 2px solid #2D2D2D;" onerror="this.src='https://i.pinimg.com/736x/84/4c/02/844c02c8639038d394ccb7af8e7b74ba.jpg'">
+            <img src="${item.url}" alt="美食照片" class="photo-main" style="width:100%; height:150px; object-fit:cover; border-bottom: 2px solid #2D2D2D;" onerror="this.src='${noImagePlaceholder}'">
             <div style="padding: 12px; text-align: left; padding-bottom: 45px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start;">
                     <h3 style="margin: 0 0 5px 0; color: #FF4D4D; font-size: 16px;">${name}</h3>
                     <span style="background: #FFF0F2; color: #FF4D4D; padding: 2px 6px; border-radius: 8px; font-size: 10px; border: 1px solid #FF4D4D; white-space: nowrap;">${tag}</span>
                 </div>
-                
                 <div style="display:flex; justify-content:space-between; font-size:12px; color:#555; margin-bottom: 5px;">
                     <span>📍 ${location}</span>
                     <span>📅 ${showDate}</span>
                 </div>
                 <p style="margin: 0 0 8px 0; font-size: 12px;">${rating}</p>
                 <p style="margin: 0; font-size: 14px; color: #555; line-height: 1.4; word-break: break-all;">${comment}</p>
-                
                 <div style="position: absolute; right: 10px; bottom: 10px; display: flex; gap: 5px;">
                     <button onclick="startEdit(${item.id})" style="background: #ECECEC; color: #2D2D2D; border: 2px solid #2D2D2D; padding: 2px 8px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">✏️</button>
                     <button onclick="deleteItem('memories', ${item.id}, loadFoods)" style="background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 8px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">✖</button>
@@ -242,31 +325,20 @@ function renderFoodList(foodsArray) {
     });
 }
 
-// 点击顶部标签按钮时触发
 window.filterByTag = function(tagValue, btnElement) {
     currentSelectedTag = tagValue;
-    
-    // 更新按钮外观（把所有按钮变成白色，被点中的变成红色）
     const btns = document.querySelectorAll('.tag-filter-btn');
-    btns.forEach(btn => {
-        btn.style.background = 'white';
-        btn.style.color = '#2D2D2D';
-    });
+    btns.forEach(btn => { btn.style.background = 'white'; btn.style.color = '#2D2D2D'; });
     btnElement.style.background = '#FF4D4D';
     btnElement.style.color = 'white';
-
-    // 触发全局筛选
     searchFood();
 }
-// 终极四重本地实时筛选：关键词 + 日期 + 标签 + 评分
+
 window.searchFood = function() {
     const textEl = document.getElementById('search-food');
     const textKeyword = textEl ? textEl.value.toLowerCase().trim() : "";
-    
     const dateEl = document.getElementById('search-date');
     const dateKeyword = dateEl ? dateEl.value : "";
-
-    // 获取新加入的评分筛选框值
     const ratingFilterEl = document.getElementById('search-rating');
     const ratingKeyword = ratingFilterEl ? ratingFilterEl.value : "All";
 
@@ -278,17 +350,13 @@ window.searchFood = function() {
             rating = parts[1] || '';
             comment = parts[2] || '';
             tag = parts[3] || '🍽️ 未分类';
-        } else {
-            comment = item.caption || "";
-        }
+        } else { comment = item.caption || ""; }
         const location = item.location || '未知';
         const visitDate = item.visit_date || '';
 
         const matchesText = name.toLowerCase().includes(textKeyword) || comment.toLowerCase().includes(textKeyword) || location.toLowerCase().includes(textKeyword);
         const matchesDate = !dateKeyword || (visitDate === dateKeyword);
         const matchesTag = (currentSelectedTag === 'All') || (tag === currentSelectedTag);
-        
-        // 关键过滤行：检查这条数据的评分是否符合所选评分条件
         const matchesRating = (ratingKeyword === 'All') || (rating.trim() === ratingKeyword.trim());
 
         return matchesText && matchesDate && matchesTag && matchesRating;
@@ -296,51 +364,42 @@ window.searchFood = function() {
     renderFoodList(filtered);
 }
 
-// 触发编辑状态
 window.startEdit = function(id) {
     const item = allFoods.find(f => f.id == id);
     if (!item) return;
-
     isImageRemoved = false; 
-    let name = "未命名记忆", rating = "⭐⭐⭐⭐⭐ 绝赞推荐！", comment = item.caption, tag = "🍱 正餐饱腹";
+    let name = "未命名记忆", rating = "⭐⭐⭐⭐微 绝赞推荐！", comment = item.caption, tag = "🍱 正餐饱腹";
     if (item.caption && item.caption.includes('||')) {
         const parts = item.caption.split('||');
-        name = parts[0];
-        rating = parts[1];
-        comment = parts[2] || '';
-        tag = parts[3] || '🍽️ 未分类'; // 获取旧记录的标签
+        name = parts[0]; rating = parts[1]; comment = parts[2] || ''; tag = parts[3] || '🍽️ 未分类';
     }
-
     document.getElementById("editing-id").value = item.id;
     document.getElementById("food-input-name").value = name;
     document.getElementById("food-input-location").value = item.location || "";
     document.getElementById("food-input-rating").value = rating;
     document.getElementById("food-input-comment").value = comment;
     
-    // 如果下拉框里没有“🍽️ 未分类”，且老数据是未分类，强行给下拉框加一个
     const tagSelect = document.getElementById("food-input-tag");
-    if(![...tagSelect.options].map(o => o.value).includes(tag)) {
+    if(tagSelect && ![...tagSelect.options].map(o => o.value).includes(tag)) {
         tagSelect.innerHTML += `<option value="${tag}">${tag}</option>`;
     }
-    tagSelect.value = tag;
-
-    if(item.visit_date) {
-        document.getElementById("food-input-date").value = item.visit_date;
-    }
+    if (tagSelect) tagSelect.value = tag;
+    if(item.visit_date) document.getElementById("food-input-date").value = item.visit_date;
 
     currentImageUrl = item.url;
     const previewImg = document.getElementById("image-preview");
     const previewContainer = document.getElementById("image-preview-container");
     const removeBtn = document.getElementById('remove-img-btn');
-
-    previewImg.src = item.url;
-    previewContainer.style.display = "block";
-    if(removeBtn) removeBtn.style.display = 'block';
-
-    document.getElementById("form-title").innerHTML = `✏️ 正在修改：${name}`;
-    document.getElementById("add-food-btn").innerText = "保存修改 💾";
-    document.getElementById("cancel-edit-btn").style.display = "block";
-    document.getElementById("form-title").scrollIntoView({ behavior: 'smooth' });
+    if (previewImg && previewContainer) {
+        previewImg.src = item.url; previewContainer.style.display = "block";
+        if(removeBtn) removeBtn.style.display = 'block';
+    }
+    const formTitle = document.getElementById("form-title");
+    if (formTitle) { formTitle.innerHTML = `✏️ 正在修改：${name}`; formTitle.scrollIntoView({ behavior: 'smooth' }); }
+    const addBtn = document.getElementById("add-food-btn");
+    if (addBtn) addBtn.innerText = "保存修改 💾";
+    const cancelBtn = document.getElementById("cancel-edit-btn");
+    if (cancelBtn) cancelBtn.style.display = "block";
 }
 
 window.resetForm = function() {
@@ -349,30 +408,30 @@ window.resetForm = function() {
     document.getElementById("food-input-location").value = "";
     document.getElementById("food-input-comment").value = "";
     document.getElementById("food-input-file").value = "";
-    document.getElementById("food-input-tag").value = "🍱 正餐饱腹"; // 默认重置为正餐
-    document.getElementById("image-preview-container").style.display = "none";
-    document.getElementById("image-preview").src = "";
-    currentImageUrl = "";
-    isImageRemoved = false; 
-
-    document.getElementById("food-input-date").value = new Date().toISOString().split('T')[0];
-
-    document.getElementById("form-title").innerHTML = `<img src="https://img.icons8.com/emoji/48/000000/hamburger-emoji.png" alt="icon"> 记录新探店`;
-    document.getElementById("add-food-btn").innerText = "收录进美食局 🍔";
-    document.getElementById("cancel-edit-btn").style.display = "none";
+    const tagSelect = document.getElementById("food-input-tag");
+    if (tagSelect) tagSelect.value = "🍱 正餐饱腹";
+    const previewContainer = document.getElementById("image-preview-container");
+    if (previewContainer) previewContainer.style.display = "none";
+    currentImageUrl = ""; isImageRemoved = false; 
+    const dateInput = document.getElementById("food-input-date");
+    if (dateInput) dateInput.value = new Date().toISOString().split('T')[0];
+    const formTitle = document.getElementById("form-title");
+    if (formTitle) formTitle.innerHTML = `<img src="https://img.icons8.com/emoji/48/000000/hamburger-emoji.png" alt="icon"> 记录新探店`;
+    const addBtn = document.getElementById("add-food-btn");
+    if (addBtn) addBtn.innerText = "收录进美食局 🍔";
+    const cancelBtn = document.getElementById("cancel-edit-btn");
+    if (cancelBtn) cancelBtn.style.display = "none";
 }
 
-// 添加与保存复合提交
 const addFoodBtn = document.getElementById('add-food-btn');
 if (addFoodBtn) {
     addFoodBtn.addEventListener('click', async () => {
         if (!supabaseClient) return alert('云端未连接');
-        
         const editingId = document.getElementById('editing-id').value;
         const nameInput = document.getElementById('food-input-name');
         const locationInput = document.getElementById('food-input-location'); 
         const ratingInput = document.getElementById('food-input-rating');
-        const tagInput = document.getElementById('food-input-tag'); // 抓取标签值
+        const tagInput = document.getElementById('food-input-tag'); 
         const fileInput = document.getElementById('food-input-file'); 
         const commentInput = document.getElementById('food-input-comment');
         const dateInput = document.getElementById('food-input-date');
@@ -382,7 +441,8 @@ if (addFoodBtn) {
         let comment = commentInput.value.trim();
         let visitDate = dateInput.value;
         let file = fileInput.files[0];
-        let tag = tagInput.value;
+        let tag = tagInput ? tagInput.value : "🍽️ 未分类";
+        let rating = ratingInput ? ratingInput.value : "";
         
         if (!name) return alert('店名不能为空哦！');
         if (!location) return alert('📍 给探店局加个地点吧！');
@@ -392,7 +452,6 @@ if (addFoodBtn) {
 
         addFoodBtn.innerText = editingId ? "正在保存修改... 💾" : "上传照片并收录中... 🕊️";
         addFoodBtn.disabled = true;
-
         let finalImageUrl = currentImageUrl; 
 
         try {
@@ -402,39 +461,24 @@ if (addFoodBtn) {
                 const { data: uploadData, error: uploadError } = await supabaseClient.storage.from('Food').upload(fileName, file);
                 if (uploadError) throw uploadError;
                 const { data: { publicUrl } } = supabaseClient.storage.from('Food').getPublicUrl(fileName);
-                finalImageUrl = publicUrl;
-                isImageRemoved = false;
-            } else if (editingId && isImageRemoved) {
-                finalImageUrl = noImagePlaceholder;
-            }
+                finalImageUrl = publicUrl; isImageRemoved = false;
+            } else if (editingId && isImageRemoved) { finalImageUrl = noImagePlaceholder; }
 
-            // 新增标签魔法打包：店名||评分||评价||标签
-            let combinedCaption = `${name}||${ratingInput.value}||${comment}||${tag}`;
-            const dbData = { 
-                url: finalImageUrl, 
-                caption: combinedCaption, 
-                location: location,
-                visit_date: visitDate
-            };
+            let combinedCaption = `${name}||${rating}||${comment}||${tag}`;
+            const dbData = { url: finalImageUrl, caption: combinedCaption, location: location, visit_date: visitDate };
 
             if (editingId) {
-                const { error: updateError } = await supabaseClient.from('memories').update(dbData).eq('id', editingId);
-                if (updateError) throw updateError;
+                await supabaseClient.from('memories').update(dbData).eq('id', editingId);
                 alert('🎉 修改成功！美食记录已悄悄更新！');
             } else {
-                const { error: insertError } = await supabaseClient.from('memories').insert([dbData]);
-                if (insertError) throw insertError;
+                await supabaseClient.from('memories').insert([dbData]);
                 alert('🍔 成功收录进美食局！小狗奖励你一根骨头！');
             }
-            
-            resetForm();
-            loadFoods();
+            resetForm(); loadFoods();
         } catch (uploadError) {
-            console.error(uploadError);
-            alert('❌ 操作失败，请检查云端设置。');
+            console.error(uploadError); alert('❌ 操作失败，请检查云端设置。');
         } finally {
-            addFoodBtn.innerText = "收录进美食局 🍔";
-            addFoodBtn.disabled = false;
+            addFoodBtn.innerText = "收录进美食局 🍔"; addFoodBtn.disabled = false;
         }
     });
 }
@@ -446,11 +490,7 @@ async function loadWishes() {
     const { data, error } = await supabaseClient.from('wishes').select('*').order('id', { ascending: true });
     if (error) return console.error(error);
     if (data.length === 0) {
-        const defaultWishes = [
-            { text: "razem 一起去海边看日出 🌅", checked: true },
-            { text: "养一只属于我们的小狗 🐶", checked: true }
-        ];
-        await supabaseClient.from('wishes').insert(defaultWishes);
+        await supabaseClient.from('wishes').insert([{ text: "razem 一起去海边看日出 🌅", checked: true }, { text: "养一只属于我们的小狗 🐶", checked: true }]);
         return loadWishes(); 
     }
     list.innerHTML = '';
@@ -463,6 +503,7 @@ async function loadWishes() {
         list.appendChild(div);
     });
 }
+
 window.toggleWish = async function(id, currentStatus) {
     if (!supabaseClient) return;
     await supabaseClient.from('wishes').update({ checked: !currentStatus }).eq('id', id);
@@ -475,8 +516,7 @@ if (addWishBtn) {
         const input = document.getElementById('wish-input');
         if (!input.value.trim()) return alert('心愿不能为空哦！');
         await supabaseClient.from('wishes').insert([{ text: input.value.trim(), checked: false }]);
-        input.value = '';
-        loadWishes();
+        input.value = ''; loadWishes();
     });
 }
 

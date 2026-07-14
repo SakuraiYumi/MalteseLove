@@ -391,3 +391,36 @@ a.link-item {
         gap: 16px;
     }
 }
+
+/* 🌟 主页快速入口专属优化 */
+
+/* 1. 把容器加宽，让一行能塞下5个 */
+.container {
+    max-width: 1000px !important; /* 原来可能比较窄，现在加宽到1000px */
+}
+
+/* 2. 强制快速入口一行显示5列 */
+.links-grid {
+    display: grid !important;
+    grid-template-columns: repeat(5, 1fr) !important;
+    gap: 15px !important;
+}
+
+/* 3. 放大快速入口里面的图片 */
+.link-item img {
+    width: 65px !important; /* 调大宽度，如果觉得还不够大可以改成 70px 或 80px */
+    height: 65px !important; /* 调大高度 */
+    object-fit: cover;
+}
+
+/* 📱 手机端适配：如果用手机看，就乖乖变回一行2个或3个，防止太挤 */
+@media (max-width: 768px) {
+    .links-grid {
+        grid-template-columns: repeat(3, 1fr) !important;
+    }
+}
+@media (max-width: 480px) {
+    .links-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+    }
+}

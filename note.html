@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小狗汪汪队 💖 生活备忘录</title>
+    <!-- 引入与首页、美食页完全一致的全局样式与可爱字体 -->
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+    
+    <!-- 引入 Supabase 核心库 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        /* 针对不同作者的小备注卡片，设置超可爱的双色 Neubrutalism 风格 */
+        .note-card-doris {
+            background: #FFF0F2 !important; /* 温柔粉 */
+            border: 3px solid #2D2D2D;
+            border-radius: 16px;
+            padding: 15px;
+            position: relative;
+        }
+        .note-card-richard {
+            background: #EBF3FE !important; /* 干净蓝 */
+            border: 3px solid #2D2D2D;
+            border-radius: 16px;
+            padding: 15px;
+            position: relative;
+        }
+        .delete-note-btn {
+            position: absolute;
+            top: 10px;
+            right: 12px;
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .delete-note-btn:hover {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        
+        <!-- 导航栏（已同步加入“便签”高亮状态） -->
+        <nav class="nav-bar">
+            <div class="user-avatars-small">
+                <img src="https://i.pinimg.com/736x/1e/c6/4c/1ec64c28cbce99261f09741f21722619.jpg" alt="小狗 A" class="avatar-small">
+                <img src="https://i.pinimg.com/736x/ab/e5/4b/abe54be077392cc5792ba49568955c56.jpg" alt="小狗 B" class="avatar-small">
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-btn">首页</a>
+                <a href="daily.html" class="nav-btn">日常</a>
+                <a href="anniversary.html" class="nav-btn">纪念日</a>
+                <a href="wish.html" class="nav-btn">心愿</a>
+                <a href="food.html" class="nav-btn">美食</a>
+                <a href="notes.html" class="nav-btn active">便签</a>
+            </div>
+        </nav>
+
+        <!-- 顶层看板 -->
+        <section class="card box-shadow" style="background: #F4EFFF; text-align: center; padding: 20px; border-radius: 20px;">
+            <h2 style="margin: 0 0 5px 0; color: #7B2CBF;">📌 生活小备注</h2>
+            <p style="margin: 0; font-size: 15px; color: #666;">碎碎念、小备忘、或者是给对方留的贴纸... 💖</p>
+        </section>
+
+        <!-- 添加新备注的输入表单 -->
+        <section class="card box-shadow" style="background: #FFFDF4; padding: 20px; border-radius: 20px;">
+            <h3 style="margin: 0 0 15px 0; color: #2D2D2D;">✍️ 贴一张新便签</h3>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
+                <!-- 作者选择下拉框 -->
+                <div style="flex: 1; min-width: 130px;">
+                    <label style="display: block; font-size: 14px; font-weight: bold; margin-bottom: 5px;">✍️ 撰写人：</label>
+                    <select id="note-author" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; font-family: inherit; background: white; cursor: pointer;">
+                        <option value="Doris">🎀 Doris 写的</option>
+                        <option value="Richard">🦖 Richard 写的</option>
+                    </select>
+                </div>
+                <!-- 日期选择框 -->
+                <div style="flex: 1; min-width: 130px;">
+                    <label style="display: block; font-size: 14px; font-weight: bold; margin-bottom: 5px;">📅 便签日期：</label>
+                    <input type="date" id="note-date" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; font-family: inherit; box-sizing: border-box;">
+                </div>
+            </div>
+
+            <!-- 便签内容输入框 -->
+            <div style="margin-bottom: 15px;">
+                <textarea id="note-content" placeholder="买牛奶、记得吃药、天气变冷要加衣服、或者是今天突然想对你说的话..." rows="3" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #2D2D2D; font-family: inherit; box-sizing: border-box; resize: none;"></textarea>
+            </div>
+
+            <button onclick="saveNote()" style="width: 100%; background-color: #FEE440; color: #2D2D2D; border: 3px solid #2D2D2D; padding: 12px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; font-family: inherit; font-size: 15px;">啪嗒！贴上便签 📌</button>
+        </section>
+
+        <!-- 便签瀑布流容器 -->
+        <section id="notes-container" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 15px; margin-top: 20px; width: 100%;">
+            <!-- 动态渲染的便签卡片会放在这里 -->
+        </section>
+        
+    </div>
+
+    <!-- 核心前后端交互脚本 -->
+    <script>
+        // 1. 初始化 Supabase 客户端 (请替换成你们真实的秘钥)
+        const SUPABASE_URL = '你的_SUPABASE_URL';
+        const SUPABASE_KEY = '你的_SUPABASE_ANON_KEY';
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+        // 页面加载完成后自动执行
+        document.addEventListener('DOMContentLoaded', () => {
+            // 让日期输入框默认选中“今天”
+            document.getElementById('note-date').valueAsDate = new Date();
+            // 从数据库拉取现有的便签
+            loadNotes();
+        });
+
+        // 2. 从 Supabase 读取并渲染便签
+        async function loadNotes() {
+            const container = document.getElementById('notes-container');
+            container.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color:#888;">正在努力搬运便签中... 🐾</p>';
+
+            try {
+                // 查询 life_notes 表，按日期和创建时间倒序排列（最新的在最前面）
+                const { data: notes, error } = await supabaseClient
+                    .from('life_notes')
+                    .select('*')
+                    .order('note_date', { ascending: false })
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                if (!notes || notes.length === 0) {
+                    container.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color:#888; padding: 40px 0;">墙上空空如也，快来贴第一张备忘便签吧！✨</p>';
+                    return;
+                }
+
+                container.innerHTML = ''; // 清空提示
+                notes.forEach(note => {
+                    // 根据不同的作者分配不同的头像/图标以及卡片样式样式
+                    const isDoris = note.author === 'Doris';
+                    const cardClass = isDoris ? 'note-card-doris box-shadow' : 'note-card-richard box-shadow';
+                    const avatarTag = isDoris ? '🎀 Doris' : '🦖 Richard';
+                    
+                    const noteElement = document.createElement('div');
+                    noteElement.className = cardClass;
+                    noteElement.innerHTML = `
+                        <button class="delete-note-btn" onclick="deleteNote(${note.id})" title="撕掉这张便签">✖</button>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed rgba(0,0,0,0.15); padding-bottom: 4px;">
+                            <span style="font-weight: bold; font-size: 14px; color: #2D2D2D;">${avatarTag}</span>
+                            <span style="font-size: 12px; color: #666; font-weight: bold;">📅 ${note.note_date}</span>
+                        </div>
+                        <div style="font-size: 15px; color: #2D2D2D; line-height: 1.5; white-space: pre-wrap; word-break: break-all;">${escapeHtml(note.content)}</div>
+                    `;
+                    container.appendChild(noteElement);
+                });
+
+            } catch (err) {
+                console.error('加载便签失败:', err);
+                container.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color:#FF4D4D;">加载失败了，请检查 Supabase 配置汪！</p>';
+            }
+        }
+
+        // 3. 将新便签保存到 Supabase
+        async function saveNote() {
+            const author = document.getElementById('note-author').value;
+            const note_date = document.getElementById('note-date').value;
+            const content = document.getElementById('note-content').value.trim();
+
+            if (!content) {
+                alert('汪！便签内容不能为空哦！填写点什么吧~');
+                return;
+            }
+
+            try {
+                // 往 Supabase 数据库插入单条记录
+                const { error } = await supabaseClient
+                    .from('life_notes')
+                    .insert([{ author, note_date, content }]);
+
+                if (error) throw error;
+
+                // 保存成功后，清空输入框并重新刷新列表
+                document.getElementById('note-content').value = '';
+                loadNotes();
+            } catch (err) {
+                console.error('保存便签失败:', err);
+                alert('保存失败了，请查看控制台报错汪！');
+            }
+        }
+
+        // 4. 从 Supabase 中撕掉（删除）便签
+        async function deleteNote(id) {
+            if (!confirm('确定要撕掉这条小备注吗？(撕掉就找不回了汪~)')) return;
+
+            try {
+                const { error } = await supabaseClient
+                    .from('life_notes')
+                    .delete()
+                    .eq('id', id);
+
+                if (error) throw error;
+                loadNotes(); // 刷新
+            } catch (err) {
+                console.error('删除便签失败:', err);
+                alert('删除失败，请稍后再试汪！');
+            }
+        }
+
+        // 辅助防注入函数：防止输入的特殊 HTML 字符破坏网页排版
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
+</body>
+</html>
