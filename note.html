@@ -41,6 +41,22 @@
         .delete-note-btn:hover {
             opacity: 1;
         }
+        
+        /* 编辑按钮样式 */
+        .edit-note-btn {
+            position: absolute;
+            top: 10px;
+            right: 38px; /* 紧挨着删除按钮 */
+            background: none;
+            border: none;
+            font-size: 16px;
+            cursor: pointer;
+            opacity: 0.5;
+            transition: opacity 0.2s;
+        }
+        .edit-note-btn:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
@@ -68,9 +84,12 @@
             <p style="margin: 0; font-size: 15px; color: #666;">碎碎念、小备忘、或者是给对方留的贴纸... 💖</p>
         </section>
 
-        <!-- 添加新备注的输入表单 -->
-        <section class="card box-shadow" style="background: #FFFDF4; padding: 20px; border-radius: 20px;">
-            <h3 style="margin: 0 0 15px 0; color: #2D2D2D;">✍️ 贴一张新便签</h3>
+        <!-- 添加/编辑备注的输入表单 -->
+        <section class="card box-shadow" style="background: #FFFDF4; padding: 20px; border-radius: 20px; margin-top: 20px;">
+            <h3 id="form-title" style="margin: 0 0 15px 0; color: #2D2D2D;">✍️ 贴一张新便签</h3>
+            
+            <!-- 隐藏字段，用来记住当前正在修改哪张便签 -->
+            <input type="hidden" id="editing-note-id" value="">
             
             <div style="display: flex; gap: 10px; margin-bottom: 15px; flex-wrap: wrap;">
                 <!-- 作者选择下拉框 -->
@@ -90,10 +109,14 @@
 
             <!-- 便签内容输入框 -->
             <div style="margin-bottom: 15px;">
-                <textarea id="note-content" placeholder="买牛奶、记得吃药、天气变冷要加衣服、或者是今天突然想对你说的话..." rows="3" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #2D2D2D; font-family: inherit; box-sizing: border-box; resize: none;"></textarea>
+                <textarea id="note-content" placeholder="买牛奶、记得吃药、天气变冷要加衣服、或者是今天突然想对告诉你的话..." rows="3" style="width: 100%; padding: 12px; border-radius: 12px; border: 2px solid #2D2D2D; font-family: inherit; box-sizing: border-box; resize: none;"></textarea>
             </div>
 
-            <button onclick="saveNote()" style="width: 100%; background-color: #FEE440; color: #2D2D2D; border: 3px solid #2D2D2D; padding: 12px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; font-family: inherit; font-size: 15px;">啪嗒！贴上便签 📌</button>
+            <!-- 操作按钮：包含保存和取消 -->
+            <div style="display: flex; gap: 10px;">
+                <button id="save-note-btn" onclick="saveNote()" style="flex: 1; background-color: #FEE440; color: #2D2D2D; border: 3px solid #2D2D2D; padding: 12px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; font-family: inherit; font-size: 15px; transition: all 0.2s;">啪嗒！贴上便签 📌</button>
+                <button id="cancel-edit-btn" onclick="cancelEdit()" style="display: none; background-color: #ECECEC; color: #2D2D2D; border: 3px solid #2D2D2D; padding: 12px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; font-family: inherit; font-size: 15px;">取消 🔙</button>
+            </div>
         </section>
 
         <!-- 便签瀑布流容器 -->
@@ -105,16 +128,16 @@
 
     <!-- 核心前后端交互脚本 -->
     <script>
-        // 1. 初始化 Supabase 客户端 (请替换成你们真实的秘钥)
-        const SUPABASE_URL = '你的_SUPABASE_URL';
-        const SUPABASE_KEY = '你的_SUPABASE_ANON_KEY';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+        // 1. 真实的云端大脑密钥 🧠 
+        const REAL_URL = 'https://ekaeienirogrgkjxvwtc.supabase.co';
+        const REAL_KEY = 'sb_publishable_mLKLqxXbN75bhUnSxkkA5w_4mwKr0rQ';
+        
+        const noteDb = window.supabase.createClient(REAL_URL, REAL_KEY);
+        let allNotesData = []; // 🐾 存放便签的百宝箱
 
         // 页面加载完成后自动执行
         document.addEventListener('DOMContentLoaded', () => {
-            // 让日期输入框默认选中“今天”
             document.getElementById('note-date').valueAsDate = new Date();
-            // 从数据库拉取现有的便签
             loadNotes();
         });
 
@@ -124,8 +147,7 @@
             container.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color:#888;">正在努力搬运便签中... 🐾</p>';
 
             try {
-                // 查询 life_notes 表，按日期和创建时间倒序排列（最新的在最前面）
-                const { data: notes, error } = await supabaseClient
+                const { data: notes, error } = await noteDb
                     .from('life_notes')
                     .select('*')
                     .order('note_date', { ascending: false })
@@ -138,18 +160,23 @@
                     return;
                 }
 
+                allNotesData = notes; // 把数据存入百宝箱
                 container.innerHTML = ''; // 清空提示
+                
                 notes.forEach(note => {
-                    // 根据不同的作者分配不同的头像/图标以及卡片样式样式
                     const isDoris = note.author === 'Doris';
                     const cardClass = isDoris ? 'note-card-doris box-shadow' : 'note-card-richard box-shadow';
                     const avatarTag = isDoris ? '🎀 Doris' : '🦖 Richard';
                     
                     const noteElement = document.createElement('div');
                     noteElement.className = cardClass;
+                    // 💡 注意：下面的 div 加了 padding-right: 55px;，完美解决重叠问题！
                     noteElement.innerHTML = `
+                        <!-- 编辑和删除按钮 -->
+                        <button class="edit-note-btn" onclick="startEditNote(${note.id})" title="修改这张便签">✏️</button>
                         <button class="delete-note-btn" onclick="deleteNote(${note.id})" title="撕掉这张便签">✖</button>
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed rgba(0,0,0,0.15); padding-bottom: 4px;">
+                        
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; border-bottom: 1px dashed rgba(0,0,0,0.15); padding-bottom: 4px; padding-right: 55px;">
                             <span style="font-weight: bold; font-size: 14px; color: #2D2D2D;">${avatarTag}</span>
                             <span style="font-size: 12px; color: #666; font-weight: bold;">📅 ${note.note_date}</span>
                         </div>
@@ -160,15 +187,48 @@
 
             } catch (err) {
                 console.error('加载便签失败:', err);
-                container.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color:#FF4D4D;">加载失败了，请检查 Supabase 配置汪！</p>';
+                container.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color:#FF4D4D;">加载失败了，请检查 Supabase 数据库表是否已建好汪！</p>';
             }
         }
 
-        // 3. 将新便签保存到 Supabase
+        // ✨ 功能：准备修改便签
+        window.startEditNote = function(id) {
+            const targetNote = allNotesData.find(n => n.id === id);
+            if (!targetNote) return;
+
+            document.getElementById('editing-note-id').value = targetNote.id;
+            document.getElementById('note-author').value = targetNote.author;
+            document.getElementById('note-date').value = targetNote.note_date;
+            document.getElementById('note-content').value = targetNote.content;
+
+            document.getElementById('form-title').innerText = "✏️ 正在修改便签...";
+            const saveBtn = document.getElementById('save-note-btn');
+            saveBtn.innerText = "保存修改 💾";
+            saveBtn.style.backgroundColor = "#48CAE4"; 
+            document.getElementById('cancel-edit-btn').style.display = "block";
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // ✨ 功能：取消修改，变回原样
+        window.cancelEdit = function() {
+            document.getElementById('editing-note-id').value = "";
+            document.getElementById('note-content').value = "";
+            document.getElementById('note-date').valueAsDate = new Date();
+            
+            document.getElementById('form-title').innerText = "✍️ 贴一张新便签";
+            const saveBtn = document.getElementById('save-note-btn');
+            saveBtn.innerText = "啪嗒！贴上便签 📌";
+            saveBtn.style.backgroundColor = "#FEE440"; 
+            document.getElementById('cancel-edit-btn').style.display = "none";
+        }
+
+        // 3. 将新便签保存到 Supabase (支持新建和修改)
         async function saveNote() {
             const author = document.getElementById('note-author').value;
             const note_date = document.getElementById('note-date').value;
             const content = document.getElementById('note-content').value.trim();
+            const editingId = document.getElementById('editing-note-id').value;
 
             if (!content) {
                 alert('汪！便签内容不能为空哦！填写点什么吧~');
@@ -176,19 +236,29 @@
             }
 
             try {
-                // 往 Supabase 数据库插入单条记录
-                const { error } = await supabaseClient
-                    .from('life_notes')
-                    .insert([{ author, note_date, content }]);
+                if (editingId) {
+                    // 更新现有便签
+                    const { error } = await noteDb
+                        .from('life_notes')
+                        .update({ author, note_date, content })
+                        .eq('id', editingId);
 
-                if (error) throw error;
+                    if (error) throw error;
+                    cancelEdit(); // 成功后退出编辑模式
+                } else {
+                    // 插入新便签
+                    const { error } = await noteDb
+                        .from('life_notes')
+                        .insert([{ author, note_date, content }]);
 
-                // 保存成功后，清空输入框并重新刷新列表
-                document.getElementById('note-content').value = '';
+                    if (error) throw error;
+                    document.getElementById('note-content').value = '';
+                }
+                
                 loadNotes();
             } catch (err) {
                 console.error('保存便签失败:', err);
-                alert('保存失败了，请查看控制台报错汪！');
+                alert('保存失败了，可能是字段名对不上，请查看 F12 控制台报错汪！');
             }
         }
 
@@ -197,13 +267,17 @@
             if (!confirm('确定要撕掉这条小备注吗？(撕掉就找不回了汪~)')) return;
 
             try {
-                const { error } = await supabaseClient
+                const { error } = await noteDb
                     .from('life_notes')
                     .delete()
                     .eq('id', id);
 
                 if (error) throw error;
-                loadNotes(); // 刷新
+                
+                // 如果刚好在编辑这张被删掉的便签，顺手退出编辑模式
+                if (document.getElementById('editing-note-id').value == id) cancelEdit();
+                
+                loadNotes(); 
             } catch (err) {
                 console.error('删除便签失败:', err);
                 alert('删除失败，请稍后再试汪！');
