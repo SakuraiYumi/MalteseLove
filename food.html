@@ -4,33 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小狗汪汪队 💖 美食探店局</title>
+    <!-- 引入了统一的 CSS 文件 -->
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    
-    <style>
-        /* 隐藏滚动条但保持可滚动（用于标签栏） */
-        #tag-filters::-webkit-scrollbar {
-            display: none;
-        }
-        /* 小狗爪特殊光标痕迹 */
-        .cursor-paw {
-            position: absolute;
-            width: 20px;
-            height: 20px;
-            background-image: url('https://img.icons8.com/emoji/48/000000/🐾-emoji.png');
-            background-size: contain;
-            pointer-events: none;
-            opacity: 0.6;
-            animation: fadeOut 1s forwards;
-            z-index: 9999;
-        }
-        @keyframes fadeOut {
-            0% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); }
-            100% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
-        }
-    </style>
 </head>
 <body>
     <div class="container">
@@ -41,14 +19,12 @@
                 <img src="https://i.pinimg.com/736x/ab/e5/4b/abe54be077392cc5792ba49568955c56.jpg" alt="小狗 B" class="avatar-small">
             </div>
             <div class="nav-links">
-                <div class="nav-links">
                 <a href="index.html" class="nav-btn">首页</a>
                 <a href="daily.html" class="nav-btn">日常</a>
-                <a href="anniversary.html" class="nav-btn active">纪念日</a>
+                <a href="anniversary.html" class="nav-btn">纪念日</a>
                 <a href="wish.html" class="nav-btn">心愿</a>
-                <a href="food.html" class="nav-btn">美食</a>
+                <a href="food.html" class="nav-btn active">美食</a>
                 <a href="note.html" class="nav-btn">便签</a> 
-                </div>
             </div>
         </nav>
 
@@ -145,5 +121,42 @@
     </div>
 
     <script src="script.js"></script>
+
+    <!-- 手机端双击放大图片的事件监听（保持在 HTML 底部即可） -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const foodList = document.getElementById('food-list');
+            let lastTapTime = 0;
+            let currentZoomedImg = null;
+
+            foodList.addEventListener('touchstart', (e) => {
+                if (e.target.tagName.toLowerCase() === 'img') {
+                    const currentTime = new Date().getTime();
+                    const tapLength = currentTime - lastTapTime;
+
+                    if (tapLength > 0 && tapLength < 300) {
+                        e.preventDefault(); 
+
+                        if (e.target.classList.contains('mobile-zoomed')) {
+                            e.target.classList.remove('mobile-zoomed');
+                            currentZoomedImg = null;
+                        } else {
+                            if (currentZoomedImg) {
+                                currentZoomedImg.classList.remove('mobile-zoomed');
+                            }
+                            e.target.classList.add('mobile-zoomed');
+                            currentZoomedImg = e.target;
+                        }
+                    }
+                    lastTapTime = currentTime;
+                } else {
+                    if (currentZoomedImg) {
+                        currentZoomedImg.classList.remove('mobile-zoomed');
+                        currentZoomedImg = null;
+                    }
+                }
+            });
+        });
+    </script>
 </body>
 </html>

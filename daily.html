@@ -9,7 +9,7 @@
 </head>
 <body>
     <div class="container">
-        <!-- 导航栏保持不变 -->
+        <!-- 导航栏 -->
         <nav class="nav-bar">
             <div class="user-avatars-small">
                 <img src="https://i.pinimg.com/736x/1e/c6/4c/1ec64c28cbce99261f09741f21722619.jpg" alt="小狗 A" class="avatar-small">
@@ -29,95 +29,249 @@
             <p class="section-title">🐱 碎碎念日记流</p>
             
             <div style="display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 3px solid #2D2D2D;">
-                <!-- 🌟 新增：日期选择器 -->
+                <!-- 🌟 日期选择器 -->
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <span style="font-weight: bold; color: #555;">📅 日期:</span>
                     <input type="date" id="diary-date-input" style="padding: 5px 10px; border: 2px solid #2D2D2D; border-radius: 8px; font-family: inherit;">
                 </div>
 
                 <textarea id="diary-input" placeholder="在这写下今天的可爱日常吧..." style="width: 100%; height: 80px; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit; resize: none;"></textarea>
-                <button id="add-diary-btn" onclick="saveDaily()" style="background-color: #FF879A; color: white; border: 2px solid #2D2D2D; padding: 8px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D;">丢进小狗日记本 🐾</button>
+                
+                <!-- 🌟 按钮区域 -->
+                <div style="display: flex; gap: 10px;">
+                    <button id="add-diary-btn-new" onclick="saveNewDaily()" style="flex: 1; background-color: #FF879A; color: white; border: 2px solid #2D2D2D; padding: 8px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; transition: all 0.2s;">丢进小狗日记本 🐾</button>
+                    
+                    <button id="cancel-edit-btn" onclick="cancelEdit()" style="display: none; background-color: #F3F4F6; color: #555; border: 2px solid #2D2D2D; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D;">取消 🚫</button>
+                </div>
+            </div>
+
+            <!-- 🌟 排序控件 (更改为 onSortChange 触发，以便回到第一页) -->
+            <div style="margin-bottom: 15px; display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-weight: bold; color: #555; font-size: 16px;">🐾 历史记录</span>
+                <select id="sort-order" onchange="onSortChange()" style="padding: 5px; border: 2px solid #2D2D2D; border-radius: 8px; cursor: pointer; font-family: inherit;">
+                    <option value="desc">👇 从新到旧 (默认)</option>
+                    <option value="asc">👆 从旧到新</option>
+                </select>
             </div>
 
             <div id="diary-list"></div>
+
+            <!-- 🌟 分页控件底座 -->
+            <div id="pagination-controls" style="display: none; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 2px dashed #ddd;">
+                <button id="prev-page-btn" onclick="prevPage()" style="background-color: #FFF; border: 2px solid #2D2D2D; padding: 6px 12px; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #2D2D2D; transition: all 0.2s;">👈 上一页</button>
+                <span id="page-info" style="font-weight: bold; color: #555; font-size: 14px;">第 1 页 / 共 1 页</span>
+                <button id="next-page-btn" onclick="nextPage()" style="background-color: #FFF; border: 2px solid #2D2D2D; padding: 6px 12px; border-radius: 12px; font-weight: bold; cursor: pointer; box-shadow: 2px 2px 0 #2D2D2D; transition: all 0.2s;">下一页 👉</button>
+            </div>
         </section>
     </div>
     
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="script.js"></script> <!-- 你的主要配置脚本 -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="script.js"></script> 
     
-    <!-- 🌟 专门处理日常日期的逻辑 -->
     <script>
-        // 页面打开时，默认把日期选为今天
+        let currentDailies = [];
+        let editingId = null; 
+        
+        // 🌟 分页相关的全局变量
+        let currentPage = 1;
+        const itemsPerPage = 20; // 👈 这里控制每页显示多少条，可以随时改哦！
+        let totalItems = 0;
+
         document.getElementById('diary-date-input').value = new Date().toISOString().split('T')[0];
 
-        // 页面加载完成后自动拉取数据
-        document.addEventListener('DOMContentLoaded', () => {
-            setTimeout(loadDailies, 500); // 稍微等0.5秒，确保数据库连接成功
+        window.addEventListener('load', () => {
+            setTimeout(loadDailies, 500); 
         });
 
-        // 🌟 读取并排序日记的魔法
+        // 🌟 当改变排序时，回到第一页再加载
+        function onSortChange() {
+            currentPage = 1;
+            loadDailies();
+        }
+
+        // 🌟 读取数据的魔法 (已加入分页)
         async function loadDailies() {
-            // 兼容性获取客户端
-            const activeClient = typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null);
-            if (!activeClient) {
+            if (typeof supabaseClient === 'undefined' || !supabaseClient) {
                 document.getElementById('diary-list').innerHTML = '<p style="text-align:center; color:#888;">云端连接中，请稍后...</p>';
                 return;
             }
 
-            // 获取当前的排序选择
             const sortOrder = document.getElementById('sort-order').value;
-            const isAscending = sortOrder === 'asc'; // asc = 从旧到新(升序)，desc = 从新到旧(降序)
+            const isAscending = (sortOrder === 'asc'); 
 
-            // 从 daily_notes 表里拿数据
-            const { data, error } = await activeClient
-                .from('daily_notes')
-                .select('*')
-                .order('diary_date', { ascending: isAscending }) // 按日期排序
-                .order('created_at', { ascending: isAscending }); // 如果同一天发了多条，按发布时间排序
+            // 计算分页区间
+            const from = (currentPage - 1) * itemsPerPage;
+            const to = from + itemsPerPage - 1;
+
+            // ⚠️ 修改：增加 { count: 'exact' } 获取总条数，增加 range 切片
+            const { data, count, error } = await supabaseClient
+                .from('diaries')
+                .select('*', { count: 'exact' }) 
+                .order('date', { ascending: isAscending })
+                .order('id', { ascending: isAscending })
+                .range(from, to); 
 
             const listContainer = document.getElementById('diary-list');
+            const paginationControls = document.getElementById('pagination-controls');
 
-            if (error || !data || data.length === 0) {
+            if (error) {
+                listContainer.innerHTML = `<p style="text-align:center; color:red;">读取出错：${error.message}</p>`;
+                return;
+            }
+
+            totalItems = count || 0;
+            currentDailies = data || [];
+
+            // 智能防空页：如果你把最后一页的最后一条删了，自动跳回上一页
+            if (currentDailies.length === 0 && currentPage > 1) {
+                currentPage--;
+                loadDailies();
+                return;
+            }
+
+            if (totalItems === 0) {
                 listContainer.innerHTML = `
                     <div style="text-align: center; padding: 20px;">
                         <img src="https://i.pinimg.com/736x/b2/4b/ab/b24babcb8298538e26c2425b699402a2.jpg" alt="空空如也" style="width: 80px; margin-bottom: 10px;">
                         <p style="color:#888;">本子里还空空的，快来写第一条吧！</p>
                     </div>`;
+                paginationControls.style.display = "none";
                 return;
             }
 
-            // 把数据渲染到页面上
-            listContainer.innerHTML = data.map(item => `
-                <div style="background: white; border: 2px solid #2D2D2D; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 3px 3px 0 #2D2D2D;">
-                    <p style="font-size: 13px; color: #888; margin: 0 0 8px 0; font-weight: bold;">📅 ${item.diary_date || '某年某月某日'}</p>
-                    <p style="margin: 0; color: #333; line-height: 1.5; white-space: pre-wrap;">${item.content}</p>
+            // 渲染日记列表
+            listContainer.innerHTML = currentDailies.map(item => `
+                <div style="background: white; border: 2px solid #2D2D2D; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 3px 3px 0 #2D2D2D; position: relative;">
+                    
+                    <div style="position: absolute; right: 15px; top: 15px; display: flex; gap: 8px;">
+                        <button onclick="startEdit(${item.id})" style="background: #E0F2FE; color: #0369A1; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">编辑 ✏️</button>
+                        <button onclick="deleteItem('diaries', ${item.id}, loadDailies)" style="background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">删除 ✖</button>
+                    </div>
+                    
+                    <p style="font-size: 13px; color: #888; margin: 0 0 8px 0; font-weight: bold;">📅 ${item.date || '无日期'}</p>
+                    <p style="margin: 0; color: #333; line-height: 1.5; white-space: pre-wrap; padding-right: 120px;">${item.text}</p>
                 </div>
             `).join('');
+
+            updatePaginationUI();
         }
 
-        // 🌟 保存日记的魔法
-        async function saveDaily() {
-            const activeClient = typeof supabaseClient !== 'undefined' ? supabaseClient : (typeof supabase !== 'undefined' ? supabase : null);
-            if (!activeClient) return alert("数据库还在连接，稍等一秒钟哦！");
+        // 🌟 更新底部分页按钮的状态
+        function updatePaginationUI() {
+            const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+            
+            document.getElementById('pagination-controls').style.display = totalPages > 1 ? "flex" : "none"; // 只有超过一页才显示分页栏
+            document.getElementById('page-info').innerText = `第 ${currentPage} 页 / 共 ${totalPages} 页`;
+
+            const prevBtn = document.getElementById('prev-page-btn');
+            const nextBtn = document.getElementById('next-page-btn');
+
+            // 禁用上一页
+            if (currentPage === 1) {
+                prevBtn.disabled = true;
+                prevBtn.style.opacity = '0.5';
+                prevBtn.style.cursor = 'not-allowed';
+            } else {
+                prevBtn.disabled = false;
+                prevBtn.style.opacity = '1';
+                prevBtn.style.cursor = 'pointer';
+            }
+
+            // 禁用下一页
+            if (currentPage >= totalPages) {
+                nextBtn.disabled = true;
+                nextBtn.style.opacity = '0.5';
+                nextBtn.style.cursor = 'not-allowed';
+            } else {
+                nextBtn.disabled = false;
+                nextBtn.style.opacity = '1';
+                nextBtn.style.cursor = 'pointer';
+            }
+        }
+
+        // 🌟 翻页逻辑
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                loadDailies();
+                window.scrollTo({ top: 300, behavior: 'smooth' }); // 翻页后稍微往上滚一点
+            }
+        }
+
+        function nextPage() {
+            const totalPages = Math.ceil(totalItems / itemsPerPage);
+            if (currentPage < totalPages) {
+                currentPage++;
+                loadDailies();
+                window.scrollTo({ top: 300, behavior: 'smooth' }); // 翻页后稍微往上滚一点
+            }
+        }
+
+        // 🌟 点击编辑按钮
+        function startEdit(id) {
+            const item = currentDailies.find(d => d.id === id);
+            if (!item) return;
+
+            document.getElementById('diary-input').value = item.text;
+            document.getElementById('diary-date-input').value = item.date;
+            editingId = id;
+
+            const mainBtn = document.getElementById('add-diary-btn-new');
+            mainBtn.innerText = "保存修改 💾";
+            mainBtn.style.backgroundColor = "#4ADE80"; 
+
+            document.getElementById('cancel-edit-btn').style.display = "inline-block";
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 🌟 取消编辑状态
+        function cancelEdit() {
+            document.getElementById('diary-input').value = '';
+            document.getElementById('diary-date-input').value = new Date().toISOString().split('T')[0];
+            editingId = null;
+
+            const mainBtn = document.getElementById('add-diary-btn-new');
+            mainBtn.innerText = "丢进小狗日记本 🐾";
+            mainBtn.style.backgroundColor = "#FF879A";
+
+            document.getElementById('cancel-edit-btn').style.display = "none";
+        }
+
+        // 🌟 保存日记
+        async function saveNewDaily() {
+            if (typeof supabaseClient === 'undefined' || !supabaseClient) return alert("数据库还在连接，稍等一秒钟哦！");
 
             const content = document.getElementById('diary-input').value.trim();
             const diaryDate = document.getElementById('diary-date-input').value;
             
             if(!content) return alert("写点东西嘛汪！🐾");
             
-            const { error } = await activeClient.from('daily_notes').insert([
-                { content: content, diary_date: diaryDate }
-            ]);
-            
-            if(!error) {
-                // 清空输入框
-                document.getElementById('diary-input').value = '';
-                // 重新刷新下方的列表
-                loadDailies(); 
-                alert("丢进日记本成功啦！🎉");
+            if (editingId) {
+                const { error } = await supabaseClient
+                    .from('diaries')
+                    .update({ text: content, date: diaryDate })
+                    .eq('id', editingId);
+                
+                if (!error) {
+                    alert("修改成功啦！✨");
+                    cancelEdit(); 
+                    loadDailies(); // 停留在当前页刷新
+                } else {
+                    alert("修改失败：" + error.message);
+                }
             } else {
-                alert("保存失败：" + error.message);
+                const { error } = await supabaseClient.from('diaries').insert([
+                    { text: content, date: diaryDate }
+                ]);
+                
+                if(!error) {
+                    document.getElementById('diary-input').value = '';
+                    currentPage = 1; // 👈 发新日记后自动回到第一页，方便看最新日记
+                    loadDailies(); 
+                    alert("丢进日记本成功啦！🎉");
+                } else {
+                    alert("保存失败：" + error.message);
+                }
             }
         }
     </script>
