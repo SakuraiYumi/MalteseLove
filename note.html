@@ -74,7 +74,8 @@
                 <a href="anniversary.html" class="nav-btn">纪念日</a>
                 <a href="wish.html" class="nav-btn">心愿</a>
                 <a href="food.html" class="nav-btn">美食</a>
-                <a href="notes.html" class="nav-btn active">便签</a>
+                <a href="checkin.html" class="nav-btn">打卡</a>
+                <a href="note.html" class="nav-btn active">便签</a>
             </div>
         </nav>
 
@@ -126,28 +127,27 @@
         
     </div>
 
-    <!-- 核心前后端交互脚本 -->
+    <script src="auth.js"></script>
+    <script src="script.js"></script>
     <script>
-        // 1. 真实的云端大脑密钥 🧠 
-        const REAL_URL = 'https://ekaeienirogrgkjxvwtc.supabase.co';
-        const REAL_KEY = 'sb_publishable_mLKLqxXbN75bhUnSxkkA5w_4mwKr0rQ';
-        
-        const noteDb = window.supabase.createClient(REAL_URL, REAL_KEY);
-        let allNotesData = []; // 🐾 存放便签的百宝箱
+        let allNotesData = [];
 
-        // 页面加载完成后自动执行
         document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('note-date').valueAsDate = new Date();
-            loadNotes();
         });
+        window.onPuppyLoveReady(loadNotes);
 
         // 2. 从 Supabase 读取并渲染便签
         async function loadNotes() {
             const container = document.getElementById('notes-container');
+            if (!window.supabaseClient) {
+                container.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color:#FF4D4D;">云端还没连上，请刷新页面汪</p>';
+                return;
+            }
             container.innerHTML = '<p style="text-align:center; grid-column: 1/-1; color:#888;">正在努力搬运便签中... 🐾</p>';
 
             try {
-                const { data: notes, error } = await noteDb
+                const { data: notes, error } = await window.supabaseClient
                     .from('life_notes')
                     .select('*')
                     .order('note_date', { ascending: false })
@@ -238,7 +238,7 @@
             try {
                 if (editingId) {
                     // 更新现有便签
-                    const { error } = await noteDb
+                    const { error } = await window.supabaseClient
                         .from('life_notes')
                         .update({ author, note_date, content })
                         .eq('id', editingId);
@@ -247,7 +247,7 @@
                     cancelEdit(); // 成功后退出编辑模式
                 } else {
                     // 插入新便签
-                    const { error } = await noteDb
+                    const { error } = await window.supabaseClient
                         .from('life_notes')
                         .insert([{ author, note_date, content }]);
 
@@ -267,7 +267,7 @@
             if (!confirm('确定要撕掉这条小备注吗？(撕掉就找不回了汪~)')) return;
 
             try {
-                const { error } = await noteDb
+                const { error } = await window.supabaseClient
                     .from('life_notes')
                     .delete()
                     .eq('id', id);

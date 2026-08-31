@@ -20,24 +20,14 @@
 const deleteBtnStyle = "background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold; float: right;";
 
 // ==================== 【防御层 2】连接云端大脑 ====================
-const supabaseUrl = 'https://ekaeienirogrgkjxvwtc.supabase.co';
-const supabaseKey = 'sb_publishable_mLKLqxXbN75bhUnSxkkA5w_4mwKr0rQ'; 
-
-let supabaseClient = null;
+let supabaseClient = window.supabaseClient || null;
 
 // 美食全局状态变量
 let allFoods = []; 
 let currentImageUrl = ""; 
 let isImageRemoved = false; 
 let currentSelectedTag = 'All'; 
-
-try {
-    if (window.supabase) {
-        supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
-    }
-} catch (error) {
-    console.error("❌ 初始化错误:", error);
-}
+let lastMemoryKey = '';
 
 // ==================== 【防御层 3】页面长好后排队执行 ====================
 document.addEventListener('DOMContentLoaded', () => {
@@ -68,17 +58,20 @@ document.addEventListener('DOMContentLoaded', () => {
         foodDateInput.value = new Date().toISOString().split('T')[0];
     }
 
-    // 4. 加载所有云端数据
-    if (supabaseClient) {
-        if (document.getElementById('diary-list')) loadDiaries();
-        if (document.getElementById('anniversary-list')) loadAnniversaries();
-        if (document.getElementById('food-list')) loadFoods();
-        if (document.getElementById('wish-list')) loadWishes(); 
-    } else {
-        // 如果云端没连上，把主页的“正在计算”改成提示，方便排查
-        const annList = document.getElementById('anniversary-list');
-        if (annList) annList.innerHTML = "<p style='color:orange; text-align:center;'>☁️ 等待云端组件加载中...</p>";
-    }
+    const bootCloud = typeof window.onPuppyLoveReady === 'function' ? window.onPuppyLoveReady : (cb) => cb();
+    bootCloud(() => {
+        supabaseClient = window.supabaseClient || supabaseClient;
+        if (supabaseClient) {
+            if (document.getElementById('diary-list') && !document.getElementById('add-diary-btn-new')) loadDiaries();
+            if (document.getElementById('anniversary-list')) loadAnniversaries();
+            if (document.getElementById('food-list')) loadFoods();
+            if (document.getElementById('wish-list')) loadWishes();
+            if (document.getElementById('random-memory-card')) loadRandomMemory();
+        } else {
+            const annList = document.getElementById('anniversary-list');
+            if (annList) annList.innerHTML = "<p style='color:orange; text-align:center;'>☁️ 等待云端组件加载中...</p>";
+        }
+    });
 });
 
 // ==================== 4. 日常记录功能 ====================
@@ -528,3 +521,90 @@ window.deleteItem = async function(tableName, id, reloadFunction) {
         reloadFunction(); 
     }
 }
+
+function escapeMem(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+}
+
+function parseFoodCaption(item) {
+    let name = '未命名记忆', comment = '', location = item.location || '';
+    if (item.caption && item.caption.includes('||')) {
+        const parts = item.caption.split('||');
+        name = parts[0];
+        comment = parts[2] || '';
+    } else {
+        comment = item.caption || '';
+    }
+    return { name, comment, location };
+}
+
+window.loadRandomMemory = async function () {
+    const card = document.getElementById('random-memory-card');
+    if (!card || !supabaseClient) return;
+    card.innerHTML = '<p style="text-align:center;color:#888;">正在翻旧相册... 🐾</p>';
+
+    const [diariesRes, foodsRes, wishesRes] = await Promise.all([
+        supabaseClient.from('diaries').select('*'),
+        supabaseClient.from('memories').select('*'),
+        supabaseClient.from('wishes').select('*').eq('checked', true)
+    ]);
+
+    const pool = [];
+    (diariesRes.data || []).forEach((item) => {
+        pool.push({
+            key: 'diary-' + item.id,
+            kind: '日记',
+            html: `<span class="memory-kind">📒 日记</span>
+                <p style="margin:0;color:#888;font-size:13px;">${escapeMem(item.date || '')}</p>
+                <p style="margin:8px 0 0;line-height:1.6;white-space:pre-wrap;">${escapeMem(item.text)}</p>`
+        });
+    });
+    (foodsRes.data || []).forEach((item) => {
+        const parsed = parseFoodCaption(item);
+        const img = item.url
+            ? `<img src="${item.url}" alt="探店" style="width:100%;border-radius:12px;border:2px solid #2D2D2D;margin-top:10px;">`
+            : '';
+        pool.push({
+            key: 'food-' + item.id,
+            kind: '探店',
+            html: `<span class="memory-kind">🍔 探店</span>
+                <p style="margin:0;font-weight:bold;font-size:18px;">${escapeMem(parsed.name)}</p>
+                <p style="margin:4px 0 0;color:#888;font-size:13px;">📍 ${escapeMem(parsed.location)} · ${escapeMem(item.visit_date || '')}</p>
+                <p style="margin:8px 0 0;line-height:1.5;">${escapeMem(parsed.comment)}</p>
+                ${img}`
+        });
+    });
+    (wishesRes.data || []).forEach((item) => {
+        pool.push({
+            key: 'wish-' + item.id,
+            kind: '心愿',
+            html: `<span class="memory-kind">🌟 已实现的心愿</span>
+                <p style="margin:8px 0 0;font-size:18px;line-height:1.5;">${escapeMem(item.text)}</p>`
+        });
+    });
+
+    if (pool.length === 0) {
+        card.innerHTML = '<p style="text-align:center;color:#888;">回忆盒还是空的，先去写日记、探店或勾上一个心愿吧 ✨</p>';
+        return;
+    }
+
+    let pick = pool[Math.floor(Math.random() * pool.length)];
+    if (pool.length > 1) {
+        let guard = 0;
+        while (pick.key === lastMemoryKey && guard < 8) {
+            pick = pool[Math.floor(Math.random() * pool.length)];
+            guard++;
+        }
+    }
+    lastMemoryKey = pick.key;
+    card.innerHTML = pick.html;
+};
+
+document.addEventListener('click', (e) => {
+    if (e.target && e.target.id === 'reshuffle-memory-btn') {
+        loadRandomMemory();
+    }
+});
