@@ -39,8 +39,34 @@ try {
     }
 
     function hideLock() {
+        window.removeEventListener('keydown', onPinKeydown, true);
         const lock = document.getElementById('auth-lock');
         if (lock) lock.remove();
+    }
+
+    function flashKey(key) {
+        const btn = document.querySelector(`.pin-key[data-key="${key}"]`);
+        if (!btn) return;
+        btn.classList.add('pressed');
+        setTimeout(() => btn.classList.remove('pressed'), 120);
+    }
+
+    function onPinKeydown(e) {
+        if (!document.getElementById('auth-lock') || submitting) return;
+        if (e.repeat) return;
+        if (e.key >= '0' && e.key <= '9') {
+            e.preventDefault();
+            flashKey(e.key);
+            pressKey(e.key);
+        } else if (e.key === 'Backspace') {
+            e.preventDefault();
+            flashKey('del');
+            pressKey('del');
+        } else if (e.key === 'Escape' || e.key === 'Delete') {
+            e.preventDefault();
+            flashKey('clear');
+            pressKey('clear');
+        }
     }
 
     function injectLogout() {
@@ -118,7 +144,7 @@ try {
         wrap.innerHTML = `
             <div class="auth-lock-card">
                 <p class="auth-lock-title">🐕 小狗汪汪队</p>
-                <p class="auth-lock-sub">输入我们的 8 位口令才能进门</p>
+                <p class="auth-lock-sub">输入 8 位数字口令</p>
                 <div id="pin-dots" class="pin-dots"></div>
                 <p id="pin-error" class="pin-error"></p>
                 <div class="pin-pad">
@@ -131,11 +157,13 @@ try {
         `;
         document.body.appendChild(wrap);
         renderDots();
-        wrap.addEventListener('click', (e) => {
+        wrap.addEventListener('pointerdown', (e) => {
             const btn = e.target.closest('.pin-key');
             if (!btn) return;
+            e.preventDefault();
             pressKey(String(btn.dataset.key));
         });
+        window.addEventListener('keydown', onPinKeydown, true);
     }
 
     async function boot() {

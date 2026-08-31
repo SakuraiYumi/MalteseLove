@@ -4,6 +4,7 @@
     window.hasPawEffectLoaded = true;
 
     document.addEventListener('mousemove', function(e) {
+        if (document.getElementById('auth-lock')) return;
         if (Math.random() > 0.15) return; 
         const paw = document.createElement('div');
         const randomDegree = Math.floor(Math.random() * 40) - 20; 

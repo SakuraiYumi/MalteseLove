@@ -469,6 +469,8 @@ body:not(.puppylove-unlocked) .container {
     box-shadow: 8px 8px 0 var(--pink-accent);
     padding: 28px 22px;
     text-align: center;
+    user-select: none;
+    -webkit-user-select: none;
 }
 
 .auth-lock-title {
@@ -524,11 +526,24 @@ body:not(.puppylove-unlocked) .container {
     font-weight: bold;
     cursor: pointer;
     box-shadow: 3px 3px 0 #2D2D2D;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    outline: none;
 }
 
-.pin-key:active {
+.pin-key:active,
+.pin-key.pressed {
     transform: translate(2px, 2px);
     box-shadow: 1px 1px 0 #2D2D2D;
+    background: #FFF0F2;
+}
+
+@media (hover: hover) and (pointer: fine) {
+    .pin-key:hover {
+        background: #FFF0F2;
+    }
 }
 
 .logout-btn {
