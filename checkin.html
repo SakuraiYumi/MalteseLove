@@ -32,7 +32,11 @@
         </section>
 
         <section class="card box-shadow" style="padding:16px;">
-            <input type="text" id="checkin-search" placeholder="🔍 搜地点（如：玄武湖 / 新街口）" style="width:100%;padding:10px;border-radius:12px;border:2px solid #2D2D2D;margin-bottom:10px;font-family:inherit;box-sizing:border-box;">
+            <div class="checkin-search-wrap">
+                <input type="text" id="checkin-search" placeholder="🔍 搜地点（玄武湖 / Tokyo Tower / 巴黎）" class="checkin-input" style="margin-bottom:0;">
+                <button type="button" id="checkin-search-btn" class="checkin-gps-btn" style="white-space:nowrap;">搜索</button>
+            </div>
+            <div id="checkin-search-results" class="checkin-search-results" hidden></div>
             <div id="checkin-map" class="checkin-map"></div>
             <button type="button" onclick="locateNow()" class="checkin-gps-btn">📍 此刻定位</button>
         </section>

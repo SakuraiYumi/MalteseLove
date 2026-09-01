@@ -65,14 +65,190 @@ function setPlace(lng, lat, placeName, address, moveMap) {
     if (address) document.getElementById('checkin-address').value = address;
 }
 
+function isLikelyChina(lng, lat) {
+    return lng >= 73 && lng <= 135 && lat >= 18 && lat <= 54;
+}
+
+function escapeSearchText(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function hideSearchResults() {
+    const box = document.getElementById('checkin-search-results');
+    if (!box) return;
+    box.hidden = true;
+    box.innerHTML = '';
+}
+
+function showSearchResults(items) {
+    const box = document.getElementById('checkin-search-results');
+    if (!box) return;
+    if (!items.length) {
+        box.hidden = false;
+        box.innerHTML = '<p style="margin:0;padding:12px;color:#888;font-size:13px;">没有找到这个地方，换个写法再试试（英文店名或城市也可以）</p>';
+        return;
+    }
+    box.hidden = false;
+    box.innerHTML = items.map((item, i) => `
+        <button type="button" class="checkin-search-item" data-idx="${i}">
+            <strong>${escapeSearchText(item.name)}</strong>
+            <span>${escapeSearchText(item.address || '')}</span>
+        </button>
+    `).join('');
+    box.querySelectorAll('.checkin-search-item').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const item = items[Number(btn.dataset.idx)];
+            if (!item) return;
+            pickSearchResult(item);
+        });
+    });
+}
+
+function pickSearchResult(item) {
+    hideSearchResults();
+    setPlace(item.lng, item.lat, item.name, item.address || item.name, true);
+    if (checkinMap) checkinMap.setZoom(item.zoom || 16);
+    const search = document.getElementById('checkin-search');
+    if (search) search.value = item.name;
+}
+
+function amapPoiToItem(poi) {
+    if (!poi || !poi.location) return null;
+    const lng = typeof poi.location.getLng === 'function' ? poi.location.getLng() : poi.location.lng;
+    const lat = typeof poi.location.getLat === 'function' ? poi.location.getLat() : poi.location.lat;
+    if (lng == null || lat == null) return null;
+    const bits = [poi.pname, poi.cityname, poi.adname, poi.address].filter(Boolean);
+    return {
+        name: poi.name || '未命名地点',
+        address: bits.join(' ') || poi.district || '',
+        lng,
+        lat,
+        zoom: 16
+    };
+}
+
+function photonToItem(feature) {
+    const coords = feature && feature.geometry && feature.geometry.coordinates;
+    const props = (feature && feature.properties) || {};
+    if (!coords || coords.length < 2) return null;
+    const name = props.name || props.street || props.city || props.country || '未命名地点';
+    const address = [props.street, props.housenumber, props.district, props.city, props.state, props.country]
+        .filter(Boolean)
+        .join(', ');
+    return { name, address, lng: coords[0], lat: coords[1], zoom: props.osm_value === 'country' ? 5 : 16 };
+}
+
+async function searchWorldwide(keyword) {
+    const lang = /[\u3400-\u9fff]/.test(keyword) ? 'zh' : 'en';
+    const url = `https://photon.komoot.io/api/?q=${encodeURIComponent(keyword)}&limit=6&lang=${lang}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('worldwide search failed');
+    const data = await res.json();
+    return (data.features || []).map(photonToItem).filter(Boolean);
+}
+
+async function reverseWorldwide(lng, lat) {
+    try {
+        const url = `https://photon.komoot.io/reverse?lon=${lng}&lat=${lat}&lang=zh`;
+        const res = await fetch(url);
+        if (!res.ok) return;
+        const data = await res.json();
+        const item = data.features && data.features[0] ? photonToItem(data.features[0]) : null;
+        if (item) setPlace(lng, lat, item.name, item.address, false);
+    } catch (err) {
+        console.error(err);
+        setPlace(lng, lat, '地图上的一个点', `${lat.toFixed(5)}, ${lng.toFixed(5)}`, false);
+    }
+}
+
+function searchWithAmap(keyword) {
+    return new Promise((resolve) => {
+        if (typeof AMap === 'undefined') return resolve([]);
+        AMap.plugin('AMap.PlaceSearch', () => {
+            const placeSearch = new AMap.PlaceSearch({
+                city: '全国',
+                citylimit: false,
+                pageSize: 6
+            });
+            placeSearch.search(keyword, (status, result) => {
+                if (status !== 'complete' || !result.poiList || !result.poiList.pois) {
+                    return resolve([]);
+                }
+                resolve(result.poiList.pois.map(amapPoiToItem).filter(Boolean));
+            });
+        });
+    });
+}
+
+window.searchCheckinPlace = async function () {
+    const input = document.getElementById('checkin-search');
+    const keyword = (input && input.value || '').trim();
+    if (!keyword) return alert('先写下要找的地方汪');
+    const btn = document.getElementById('checkin-search-btn');
+    if (btn) {
+        btn.disabled = true;
+        btn.textContent = '搜索中';
+    }
+    try {
+        let items;
+        const looksForeign = /[A-Za-z]/.test(keyword) && !/[\u3400-\u9fff]/.test(keyword);
+        if (looksForeign) {
+            items = await searchWorldwide(keyword);
+            if (!items.length) items = await searchWithAmap(keyword);
+        } else {
+            items = await searchWithAmap(keyword);
+            if (!items.length) items = await searchWorldwide(keyword);
+        }
+        if (items.length === 1) {
+            hideSearchResults();
+            pickSearchResult(items[0]);
+        } else {
+            showSearchResults(items);
+        }
+    } catch (err) {
+        console.error(err);
+        showSearchResults([]);
+    } finally {
+        if (btn) {
+            btn.disabled = false;
+            btn.textContent = '搜索';
+        }
+    }
+};
+
+function applyPoiSelection(poi) {
+    const item = amapPoiToItem(poi);
+    if (item) {
+        pickSearchResult(item);
+        return;
+    }
+    const keyword = (poi && (poi.name || poi.district)) || '';
+    if (keyword) {
+        const input = document.getElementById('checkin-search');
+        if (input) input.value = keyword;
+        window.searchCheckinPlace();
+    }
+}
+
 function reverseGeocode(lng, lat) {
+    if (!isLikelyChina(lng, lat)) {
+        reverseWorldwide(lng, lat);
+        return;
+    }
     AMap.plugin('AMap.Geocoder', () => {
         const geocoder = new AMap.Geocoder();
         geocoder.getAddress([lng, lat], (status, result) => {
-            if (status !== 'complete' || !result.regeocode) return;
-            const addr = result.regeocode.formattedAddress || '';
-            const poi = (result.regeocode.pois && result.regeocode.pois[0] && result.regeocode.pois[0].name) || '';
-            setPlace(lng, lat, poi || addr, addr, false);
+            if (status === 'complete' && result.regeocode && result.regeocode.formattedAddress) {
+                const addr = result.regeocode.formattedAddress;
+                const poi = (result.regeocode.pois && result.regeocode.pois[0] && result.regeocode.pois[0].name) || '';
+                setPlace(lng, lat, poi || addr, addr, false);
+                return;
+            }
+            reverseWorldwide(lng, lat);
         });
     });
 }
@@ -95,12 +271,14 @@ function initMap() {
         reverseGeocode(lng, lat);
     });
     AMap.plugin(['AMap.AutoComplete', 'AMap.PlaceSearch'], () => {
-        const auto = new AMap.AutoComplete({ input: 'checkin-search' });
+        const auto = new AMap.AutoComplete({
+            input: 'checkin-search',
+            city: '全国',
+            citylimit: false
+        });
         auto.on('select', (e) => {
-            if (!e.poi || !e.poi.location) return;
-            const { lng, lat } = e.poi.location;
-            setPlace(lng, lat, e.poi.name || '', e.poi.address || '', true);
-            checkinMap.setZoom(16);
+            if (!e.poi) return;
+            applyPoiSelection(e.poi);
         });
     });
 }
@@ -337,6 +515,17 @@ window.onPuppyLoveReady(async () => {
     document.getElementById('checkin-date').value = localDateValue(now);
     document.getElementById('checkin-time').value = localTimeValue(now);
     fillTypeSelect();
+    const searchInput = document.getElementById('checkin-search');
+    const searchBtn = document.getElementById('checkin-search-btn');
+    if (searchBtn) searchBtn.addEventListener('click', () => window.searchCheckinPlace());
+    if (searchInput) {
+        searchInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                window.searchCheckinPlace();
+            }
+        });
+    }
     try {
         await loadAmapScript();
         initMap();
