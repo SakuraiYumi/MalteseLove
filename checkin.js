@@ -2,6 +2,9 @@ const DEFAULT_CHECKIN_TYPES = ['约会', '旅行', '散步', '电影演出', '�
 
 let checkinMap = null;
 let checkinMarker = null;
+let chinaLayer = null;
+let worldLayer = null;
+let usingChinaMap = true;
 let currentLat = null;
 let currentLng = null;
 let allCheckins = [];
@@ -46,26 +49,87 @@ function fillTypeSelect(selected) {
     }
 }
 
-function setPlace(lng, lat, placeName, address, moveMap) {
+function isLikelyChina(lng, lat) {
+    return lng >= 73 && lng <= 135 && lat >= 18 && lat <= 54;
+}
+
+function outOfChina(lng, lat) {
+    return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
+}
+
+function transformLat(lng, lat) {
+    let ret = -100 + 2 * lng + 3 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng));
+    ret += (20 * Math.sin(6 * lng * Math.PI) + 20 * Math.sin(2 * lng * Math.PI)) * 2 / 3;
+    ret += (20 * Math.sin(lat * Math.PI) + 40 * Math.sin(lat / 3 * Math.PI)) * 2 / 3;
+    ret += (160 * Math.sin(lat / 12 * Math.PI) + 320 * Math.sin(lat * Math.PI / 30)) * 2 / 3;
+    return ret;
+}
+
+function transformLng(lng, lat) {
+    let ret = 300 + lng + 2 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng));
+    ret += (20 * Math.sin(6 * lng * Math.PI) + 20 * Math.sin(2 * lng * Math.PI)) * 2 / 3;
+    ret += (20 * Math.sin(lng * Math.PI) + 40 * Math.sin(lng / 3 * Math.PI)) * 2 / 3;
+    ret += (150 * Math.sin(lng / 12 * Math.PI) + 300 * Math.sin(lng / 30 * Math.PI)) * 2 / 3;
+    return ret;
+}
+
+function wgs84ToGcj02(lng, lat) {
+    if (outOfChina(lng, lat)) return [lng, lat];
+    let dlat = transformLat(lng - 105, lat - 35);
+    let dlng = transformLng(lng - 105, lat - 35);
+    const radlat = lat / 180 * Math.PI;
+    let magic = Math.sin(radlat);
+    magic = 1 - 0.00669342162296594323 * magic * magic;
+    const sqrtmagic = Math.sqrt(magic);
+    dlat = (dlat * 180) / ((6378245 * (1 - 0.00669342162296594323)) / (magic * sqrtmagic) * Math.PI);
+    dlng = (dlng * 180) / (6378245 / sqrtmagic * Math.cos(radlat) * Math.PI);
+    return [lng + dlng, lat + dlat];
+}
+
+function gcj02ToWgs84(lng, lat) {
+    const [glng, glat] = wgs84ToGcj02(lng, lat);
+    return [lng * 2 - glng, lat * 2 - glat];
+}
+
+function useChinaMap(on) {
+    if (!checkinMap || !chinaLayer || !worldLayer) return;
+    if (on === usingChinaMap && checkinMap.hasLayer(on ? chinaLayer : worldLayer)) return;
+    usingChinaMap = on;
+    if (on) {
+        if (checkinMap.hasLayer(worldLayer)) checkinMap.removeLayer(worldLayer);
+        if (!checkinMap.hasLayer(chinaLayer)) chinaLayer.addTo(checkinMap);
+    } else {
+        if (checkinMap.hasLayer(chinaLayer)) checkinMap.removeLayer(chinaLayer);
+        if (!checkinMap.hasLayer(worldLayer)) worldLayer.addTo(checkinMap);
+    }
+}
+
+function markerLatLng(lng, lat) {
+    if (isLikelyChina(lng, lat)) {
+        useChinaMap(true);
+        const [glng, glat] = wgs84ToGcj02(lng, lat);
+        return [glat, glng];
+    }
+    useChinaMap(false);
+    return [lat, lng];
+}
+
+function setPlace(lng, lat, placeName, address, moveMap, zoom) {
     currentLng = lng;
     currentLat = lat;
     if (!checkinMap || typeof L === 'undefined') return;
-    const pos = [lat, lng];
+    const pos = markerLatLng(lng, lat);
     if (!checkinMarker) {
         checkinMarker = L.marker(pos).addTo(checkinMap);
     } else {
         checkinMarker.setLatLng(pos);
     }
     if (moveMap !== false) {
-        const zoom = Math.max(checkinMap.getZoom() || 13, 14);
-        checkinMap.setView(pos, zoom);
+        const z = zoom || Math.max(checkinMap.getZoom() || 13, 14);
+        checkinMap.setView(pos, z);
     }
     if (placeName) document.getElementById('checkin-place').value = placeName;
     if (address) document.getElementById('checkin-address').value = address;
-}
-
-function isLikelyChina(lng, lat) {
-    return lng >= 73 && lng <= 135 && lat >= 18 && lat <= 54;
 }
 
 function escapeSearchText(text) {
@@ -142,8 +206,7 @@ function showSearchResults(items) {
 
 function pickSearchResult(item) {
     hideSearchResults();
-    setPlace(item.lng, item.lat, item.name, item.address || item.name, true);
-    if (checkinMap) checkinMap.setView([item.lat, item.lng], item.zoom || 16);
+    setPlace(item.lng, item.lat, item.name, item.address || item.name, true, item.zoom || 16);
 }
 
 function amapPoiToItem(poi) {
@@ -341,14 +404,27 @@ function initMap() {
     }
     holder.innerHTML = '';
     checkinMap = L.map(holder, { zoomControl: true }).setView([32.060255, 118.796877], 12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    chinaLayer = L.tileLayer('https://webrd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&scale=1&style=8&x={x}&y={y}&z={z}', {
+        maxZoom: 18,
+        subdomains: '1234',
+        attribution: '&copy; 高德地图'
+    });
+    worldLayer = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; OpenStreetMap &copy; CARTO'
-    }).addTo(checkinMap);
+        attribution: '&copy; OpenStreetMap'
+    });
+    chinaLayer.addTo(checkinMap);
+    usingChinaMap = true;
     checkinMap.on('click', (e) => {
-        setPlace(e.latlng.lng, e.latlng.lat, '', '', false);
-        reverseGeocode(e.latlng.lng, e.latlng.lat);
+        let lng = e.latlng.lng;
+        let lat = e.latlng.lat;
+        if (usingChinaMap) {
+            const converted = gcj02ToWgs84(lng, lat);
+            lng = converted[0];
+            lat = converted[1];
+        }
+        setPlace(lng, lat, '', '', false);
+        reverseGeocode(lng, lat);
     });
     setTimeout(() => checkinMap.invalidateSize(), 250);
 }
@@ -358,8 +434,7 @@ window.locateNow = function () {
     navigator.geolocation.getCurrentPosition((pos) => {
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
-        setPlace(lng, lat, '', '', true);
-        if (checkinMap) checkinMap.setView([lat, lng], 16);
+        setPlace(lng, lat, '', '', true, 16);
         reverseGeocode(lng, lat);
     }, () => {
         alert('没拿到定位，请允许定位权限，或改成在地图上点选');
@@ -485,8 +560,7 @@ window.completeCheckin = async function (id) {
 window.focusCheckinOnMap = function (id) {
     const item = allCheckins.find((c) => c.id === id);
     if (!item || !checkinMap) return;
-    setPlace(item.lng, item.lat, item.place_name, item.address, true);
-    if (checkinMap) checkinMap.setView([item.lat, item.lng], 16);
+    setPlace(item.lng, item.lat, item.place_name, item.address, true, 16);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
