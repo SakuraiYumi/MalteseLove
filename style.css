@@ -658,6 +658,21 @@ body:not(.puppylove-unlocked) .container {
     font-family: inherit;
 }
 
+.checkin-pin {
+    background: none !important;
+    border: none !important;
+}
+
+.checkin-pin img {
+    width: 48px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 3px solid #2D2D2D;
+    box-shadow: 3px 3px 0 #FF879A;
+    display: block;
+}
+
 .checkin-gps-btn,
 .checkin-upload-label {
     display: inline-block;

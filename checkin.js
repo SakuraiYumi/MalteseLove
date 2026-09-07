@@ -114,13 +114,22 @@ function markerLatLng(lng, lat) {
     return [lat, lng];
 }
 
+function getCheckinPinIcon() {
+    return L.divIcon({
+        className: 'checkin-pin',
+        html: '<img src="https://i.pinimg.com/736x/82/f2/9e/82f29e056c870ae73498ae8a0edb66fa.jpg" alt="打卡">',
+        iconSize: [48, 48],
+        iconAnchor: [24, 46]
+    });
+}
+
 function setPlace(lng, lat, placeName, address, moveMap, zoom) {
     currentLng = lng;
     currentLat = lat;
     if (!checkinMap || typeof L === 'undefined') return;
     const pos = markerLatLng(lng, lat);
     if (!checkinMarker) {
-        checkinMarker = L.marker(pos).addTo(checkinMap);
+        checkinMarker = L.marker(pos, { icon: getCheckinPinIcon() }).addTo(checkinMap);
     } else {
         checkinMarker.setLatLng(pos);
     }
