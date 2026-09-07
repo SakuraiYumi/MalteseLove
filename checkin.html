@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小狗汪汪队 💖 地图打卡</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=7">
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -38,7 +38,7 @@
                 <input type="text" id="checkin-search" placeholder="🔍 搜地点（玄武湖 / 悉尼歌剧院 / Tokyo）" class="checkin-input" style="margin-bottom:0;" autocomplete="off">
                 <button type="button" id="checkin-search-btn" class="checkin-gps-btn" style="white-space:nowrap;">搜索</button>
             </div>
-            <p class="checkin-search-hint">点下面的结果才会跳转；点错了改字就会出现新列表。国内是高德地图，国外会自动换成世界地图。</p>
+            <p class="checkin-search-hint">点下面的结果才会跳转；点错了改字就会出现新列表。</p>
             <div id="checkin-search-results" class="checkin-search-results" hidden></div>
             <div id="checkin-map" class="checkin-map"></div>
             <button type="button" onclick="locateNow()" class="checkin-gps-btn">📍 此刻定位</button>
@@ -98,8 +98,8 @@
         <section id="checkin-list" class="checkin-list"></section>
     </div>
 
-    <script src="auth.js"></script>
-    <script src="script.js"></script>
-    <script src="checkin.js"></script>
+    <script src="auth.js?v=7"></script>
+    <script src="script.js?v=7"></script>
+    <script src="checkin.js?v=7"></script>
 </body>
 </html>
