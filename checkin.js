@@ -2,6 +2,9 @@ const DEFAULT_CHECKIN_TYPES = ['约会', '旅行', '散步', '电影演出', '�
 
 let checkinMap = null;
 let checkinMarker = null;
+let amapMap = null;
+let amapMarker = null;
+let usingAmap = false;
 let currentLat = null;
 let currentLng = null;
 let allCheckins = [];
@@ -46,14 +49,56 @@ function fillTypeSelect(selected) {
     }
 }
 
+const PIN_IMAGE = 'images/checkin-pin.jpg?v=8';
+const DEFAULT_LNG = 118.796877;
+const DEFAULT_LAT = 32.060255;
+
 function isLikelyChina(lng, lat) {
     return lng >= 73 && lng <= 135 && lat >= 18 && lat <= 54;
 }
 
+function outOfChina(lng, lat) {
+    return lng < 72.004 || lng > 137.8347 || lat < 0.8293 || lat > 55.8271;
+}
+
+function transformLat(lng, lat) {
+    let ret = -100 + 2 * lng + 3 * lat + 0.2 * lat * lat + 0.1 * lng * lat + 0.2 * Math.sqrt(Math.abs(lng));
+    ret += (20 * Math.sin(6 * lng * Math.PI) + 20 * Math.sin(2 * lng * Math.PI)) * 2 / 3;
+    ret += (20 * Math.sin(lat * Math.PI) + 40 * Math.sin(lat / 3 * Math.PI)) * 2 / 3;
+    ret += (160 * Math.sin(lat / 12 * Math.PI) + 320 * Math.sin(lat * Math.PI / 30)) * 2 / 3;
+    return ret;
+}
+
+function transformLng(lng, lat) {
+    let ret = 300 + lng + 2 * lat + 0.1 * lng * lng + 0.1 * lng * lat + 0.1 * Math.sqrt(Math.abs(lng));
+    ret += (20 * Math.sin(6 * lng * Math.PI) + 20 * Math.sin(2 * lng * Math.PI)) * 2 / 3;
+    ret += (20 * Math.sin(lng * Math.PI) + 40 * Math.sin(lng / 3 * Math.PI)) * 2 / 3;
+    ret += (150 * Math.sin(lng / 12 * Math.PI) + 300 * Math.sin(lng / 30 * Math.PI)) * 2 / 3;
+    return ret;
+}
+
+function wgs84ToGcj02(lng, lat) {
+    if (outOfChina(lng, lat)) return [lng, lat];
+    let dlat = transformLat(lng - 105, lat - 35);
+    let dlng = transformLng(lng - 105, lat - 35);
+    const radlat = lat / 180 * Math.PI;
+    let magic = Math.sin(radlat);
+    magic = 1 - 0.00669342162296594323 * magic * magic;
+    const sqrtmagic = Math.sqrt(magic);
+    dlat = (dlat * 180) / ((6378245 * (1 - 0.00669342162296594323)) / (magic * sqrtmagic) * Math.PI);
+    dlng = (dlng * 180) / (6378245 / sqrtmagic * Math.cos(radlat) * Math.PI);
+    return [lng + dlng, lat + dlat];
+}
+
+function gcj02ToWgs84(lng, lat) {
+    const [glng, glat] = wgs84ToGcj02(lng, lat);
+    return [lng * 2 - glng, lat * 2 - glat];
+}
+
 function getCheckinPinIcon() {
     return L.icon({
-        iconUrl: 'images/checkin-pin.jpg?v=7',
-        iconRetinaUrl: 'images/checkin-pin.jpg?v=7',
+        iconUrl: PIN_IMAGE,
+        iconRetinaUrl: PIN_IMAGE,
         iconSize: [52, 52],
         iconAnchor: [26, 50],
         shadowUrl: '',
@@ -62,9 +107,41 @@ function getCheckinPinIcon() {
     });
 }
 
-function setPlace(lng, lat, placeName, address, moveMap, zoom) {
-    currentLng = lng;
-    currentLat = lat;
+function pinMarkerHtml() {
+    return `<div class="checkin-amap-pin"><img src="${PIN_IMAGE}" alt="打卡"></div>`;
+}
+
+function showChinaMap(on) {
+    const leafletEl = document.getElementById('checkin-leaflet');
+    const amapEl = document.getElementById('checkin-amap');
+    usingAmap = !!(on && amapMap);
+    if (leafletEl) leafletEl.classList.toggle('is-hidden', usingAmap);
+    if (amapEl) amapEl.classList.toggle('is-hidden', !usingAmap);
+    setTimeout(() => {
+        if (usingAmap && amapMap) amapMap.resize();
+        else if (checkinMap) checkinMap.invalidateSize();
+    }, 80);
+}
+
+function setAmapMarker(glng, glat, moveMap, zoom) {
+    if (!amapMap || typeof AMap === 'undefined') return;
+    const pos = [glng, glat];
+    if (!amapMarker) {
+        amapMarker = new AMap.Marker({
+            position: pos,
+            content: pinMarkerHtml(),
+            offset: new AMap.Pixel(-26, -50)
+        });
+        amapMap.add(amapMarker);
+    } else {
+        amapMarker.setPosition(pos);
+    }
+    if (moveMap !== false) {
+        amapMap.setZoomAndCenter(zoom || Math.max(amapMap.getZoom() || 13, 14), pos);
+    }
+}
+
+function setLeafletMarker(lng, lat, moveMap, zoom) {
     if (!checkinMap || typeof L === 'undefined') return;
     const pos = [lat, lng];
     if (!checkinMarker) {
@@ -76,6 +153,19 @@ function setPlace(lng, lat, placeName, address, moveMap, zoom) {
     if (moveMap !== false) {
         const z = zoom || Math.max(checkinMap.getZoom() || 13, 14);
         checkinMap.setView(pos, z);
+    }
+}
+
+function setPlace(lng, lat, placeName, address, moveMap, zoom) {
+    currentLng = lng;
+    currentLat = lat;
+    const china = isLikelyChina(lng, lat);
+    showChinaMap(china);
+    if (usingAmap) {
+        const [glng, glat] = wgs84ToGcj02(lng, lat);
+        setAmapMarker(glng, glat, moveMap, zoom);
+    } else {
+        setLeafletMarker(lng, lat, moveMap, zoom);
     }
     if (placeName) document.getElementById('checkin-place').value = placeName;
     if (address) document.getElementById('checkin-address').value = address;
@@ -164,12 +254,13 @@ function amapPoiToItem(poi) {
     const lat = typeof poi.location.getLat === 'function' ? poi.location.getLat() : poi.location.lat;
     if (lng == null || lat == null) return null;
     const bits = [poi.pname, poi.cityname, poi.adname, poi.address].filter(Boolean);
+    const wgs = gcj02ToWgs84(lng, lat);
     return {
         name: poi.name || '未命名地点',
         address: bits.join(' ') || poi.district || '',
         country: poi.pname || '',
-        lng,
-        lat,
+        lng: wgs[0],
+        lat: wgs[1],
         zoom: 16
     };
 }
@@ -341,36 +432,75 @@ function scheduleSearch() {
     searchTimer = setTimeout(() => window.searchCheckinPlace(true), 380);
 }
 
+function reverseAmap(lng, lat) {
+    if (typeof AMap === 'undefined') {
+        reverseWorldwide(lng, lat);
+        return;
+    }
+    const [glng, glat] = wgs84ToGcj02(lng, lat);
+    AMap.plugin('AMap.Geocoder', () => {
+        const geocoder = new AMap.Geocoder();
+        geocoder.getAddress([glng, glat], (status, result) => {
+            if (status === 'complete' && result.regeocode) {
+                const addr = result.regeocode.formattedAddress || '';
+                const poi = result.regeocode.pois && result.regeocode.pois[0];
+                setPlace(lng, lat, (poi && poi.name) || addr || '地图上的一个点', addr, false);
+                return;
+            }
+            reverseWorldwide(lng, lat);
+        });
+    });
+}
+
 function reverseGeocode(lng, lat) {
-    reverseWorldwide(lng, lat);
+    if (isLikelyChina(lng, lat)) reverseAmap(lng, lat);
+    else reverseWorldwide(lng, lat);
 }
 
 function initMap() {
     const holder = document.getElementById('checkin-map');
-    if (!holder || typeof L === 'undefined') {
+    const leafletEl = document.getElementById('checkin-leaflet');
+    const amapEl = document.getElementById('checkin-amap');
+    if (!holder || !leafletEl || typeof L === 'undefined') {
         if (holder) holder.innerHTML = '<p style="padding:20px;text-align:center;color:#888;">地图加载失败，请刷新后再试</p>';
         return;
     }
-    holder.innerHTML = '';
-    checkinMap = L.map(holder, { zoomControl: true }).setView([32.060255, 118.796877], 12);
-    const worldTiles = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 19,
-        attribution: 'Tiles &copy; Esri'
-    });
-    const osmTiles = L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+
+    checkinMap = L.map(leafletEl, { zoomControl: true }).setView([DEFAULT_LAT, DEFAULT_LNG], 12);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap'
-    });
-    worldTiles.addTo(checkinMap);
-    worldTiles.on('tileerror', () => {
-        if (!checkinMap.hasLayer(osmTiles)) osmTiles.addTo(checkinMap);
-    });
-    checkinMarker = L.marker([32.060255, 118.796877], { icon: getCheckinPinIcon() }).addTo(checkinMap);
+    }).addTo(checkinMap);
+    checkinMarker = L.marker([DEFAULT_LAT, DEFAULT_LNG], { icon: getCheckinPinIcon() }).addTo(checkinMap);
     checkinMap.on('click', (e) => {
         setPlace(e.latlng.lng, e.latlng.lat, '', '', false);
         reverseGeocode(e.latlng.lng, e.latlng.lat);
     });
-    setTimeout(() => checkinMap.invalidateSize(), 250);
+
+    if (typeof AMap !== 'undefined' && amapEl) {
+        const [glng, glat] = wgs84ToGcj02(DEFAULT_LNG, DEFAULT_LAT);
+        amapMap = new AMap.Map(amapEl, {
+            zoom: 12,
+            center: [glng, glat],
+            resizeEnable: true
+        });
+        setAmapMarker(glng, glat, false, 12);
+        amapMap.on('click', (e) => {
+            const glngClick = e.lnglat.getLng();
+            const glatClick = e.lnglat.getLat();
+            const wgs = gcj02ToWgs84(glngClick, glatClick);
+            setPlace(wgs[0], wgs[1], '', '', false);
+            reverseGeocode(wgs[0], wgs[1]);
+        });
+        showChinaMap(true);
+    } else {
+        showChinaMap(false);
+    }
+
+    setTimeout(() => {
+        if (amapMap) amapMap.resize();
+        if (checkinMap) checkinMap.invalidateSize();
+    }, 250);
 }
 
 window.locateNow = function () {
@@ -503,7 +633,7 @@ window.completeCheckin = async function (id) {
 
 window.focusCheckinOnMap = function (id) {
     const item = allCheckins.find((c) => c.id === id);
-    if (!item || !checkinMap) return;
+    if (!item) return;
     setPlace(item.lng, item.lat, item.place_name, item.address, true, 16);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
