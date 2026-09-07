@@ -1,8 +1,4 @@
 const DEFAULT_CHECKIN_TYPES = ['约会', '旅行', '散步', '电影演出', '其他'];
-const AMAP_KEY = '25a6b0cded2ed000294953ca70f53119';
-const AMAP_SECRET = 'd950d6e7f839005adca23315fd952b7c';
-
-window._AMapSecurityConfig = { securityJsCode: AMAP_SECRET };
 
 let checkinMap = null;
 let checkinMarker = null;
@@ -53,14 +49,17 @@ function fillTypeSelect(selected) {
 function setPlace(lng, lat, placeName, address, moveMap) {
     currentLng = lng;
     currentLat = lat;
-    if (!checkinMap) return;
-    const pos = [lng, lat];
+    if (!checkinMap || typeof L === 'undefined') return;
+    const pos = [lat, lng];
     if (!checkinMarker) {
-        checkinMarker = new AMap.Marker({ position: pos, map: checkinMap });
+        checkinMarker = L.marker(pos).addTo(checkinMap);
     } else {
-        checkinMarker.setPosition(pos);
+        checkinMarker.setLatLng(pos);
     }
-    if (moveMap !== false) checkinMap.setCenter(pos);
+    if (moveMap !== false) {
+        const zoom = Math.max(checkinMap.getZoom() || 13, 14);
+        checkinMap.setView(pos, zoom);
+    }
     if (placeName) document.getElementById('checkin-place').value = placeName;
     if (address) document.getElementById('checkin-address').value = address;
 }
@@ -144,7 +143,7 @@ function showSearchResults(items) {
 function pickSearchResult(item) {
     hideSearchResults();
     setPlace(item.lng, item.lat, item.name, item.address || item.name, true);
-    if (checkinMap) checkinMap.setZoom(item.zoom || 16);
+    if (checkinMap) checkinMap.setView([item.lat, item.lng], item.zoom || 16);
 }
 
 function amapPoiToItem(poi) {
@@ -331,63 +330,40 @@ function scheduleSearch() {
 }
 
 function reverseGeocode(lng, lat) {
-    if (!isLikelyChina(lng, lat)) {
-        reverseWorldwide(lng, lat);
-        return;
-    }
-    AMap.plugin('AMap.Geocoder', () => {
-        const geocoder = new AMap.Geocoder();
-        geocoder.getAddress([lng, lat], (status, result) => {
-            if (status === 'complete' && result.regeocode && result.regeocode.formattedAddress) {
-                const addr = result.regeocode.formattedAddress;
-                const poi = (result.regeocode.pois && result.regeocode.pois[0] && result.regeocode.pois[0].name) || '';
-                setPlace(lng, lat, poi || addr, addr, false);
-                return;
-            }
-            reverseWorldwide(lng, lat);
-        });
-    });
+    reverseWorldwide(lng, lat);
 }
 
 function initMap() {
     const holder = document.getElementById('checkin-map');
-    if (!holder || typeof AMap === 'undefined') {
-        if (holder) holder.innerHTML = '<p style="padding:20px;text-align:center;color:#888;">地图加载失败，请检查高德 Key 和域名白名单</p>';
+    if (!holder || typeof L === 'undefined') {
+        if (holder) holder.innerHTML = '<p style="padding:20px;text-align:center;color:#888;">地图加载失败，请刷新后再试</p>';
         return;
     }
-    checkinMap = new AMap.Map('checkin-map', {
-        zoom: 13,
-        center: [118.796877, 32.060255],
-        viewMode: '2D'
-    });
+    holder.innerHTML = '';
+    checkinMap = L.map(holder, { zoomControl: true }).setView([32.060255, 118.796877], 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        subdomains: 'abcd',
+        attribution: '&copy; OpenStreetMap &copy; CARTO'
+    }).addTo(checkinMap);
     checkinMap.on('click', (e) => {
-        const lng = e.lnglat.getLng();
-        const lat = e.lnglat.getLat();
-        setPlace(lng, lat, '', '', false);
-        reverseGeocode(lng, lat);
+        setPlace(e.latlng.lng, e.latlng.lat, '', '', false);
+        reverseGeocode(e.latlng.lng, e.latlng.lat);
     });
+    setTimeout(() => checkinMap.invalidateSize(), 250);
 }
 
 window.locateNow = function () {
-    if (typeof AMap === 'undefined') return alert('地图还没准备好汪');
-    AMap.plugin('AMap.Geolocation', () => {
-        const geo = new AMap.Geolocation({
-            enableHighAccuracy: true,
-            timeout: 12000,
-            zoomToAccuracy: true
-        });
-        geo.getCurrentPosition((status, result) => {
-            if (status !== 'complete' || !result.position) {
-                return alert('没拿到定位，请允许定位权限，或改成在地图上点选');
-            }
-            const lng = result.position.lng;
-            const lat = result.position.lat;
-            const addr = result.formattedAddress || '';
-            setPlace(lng, lat, addr, addr, true);
-            checkinMap.setZoom(16);
-            reverseGeocode(lng, lat);
-        });
-    });
+    if (!navigator.geolocation) return alert('这台设备不支持定位汪');
+    navigator.geolocation.getCurrentPosition((pos) => {
+        const lat = pos.coords.latitude;
+        const lng = pos.coords.longitude;
+        setPlace(lng, lat, '', '', true);
+        if (checkinMap) checkinMap.setView([lat, lng], 16);
+        reverseGeocode(lng, lat);
+    }, () => {
+        alert('没拿到定位，请允许定位权限，或改成在地图上点选');
+    }, { enableHighAccuracy: true, timeout: 12000 });
 };
 
 window.onCheckinTypeChange = function () {
@@ -510,7 +486,7 @@ window.focusCheckinOnMap = function (id) {
     const item = allCheckins.find((c) => c.id === id);
     if (!item || !checkinMap) return;
     setPlace(item.lng, item.lat, item.place_name, item.address, true);
-    checkinMap.setZoom(16);
+    if (checkinMap) checkinMap.setView([item.lat, item.lng], 16);
     window.scrollTo({ top: 0, behavior: 'smooth' });
 };
 
@@ -584,17 +560,6 @@ function renderCheckins() {
     }).join('');
 }
 
-function loadAmapScript() {
-    return new Promise((resolve, reject) => {
-        if (typeof AMap !== 'undefined') return resolve();
-        const script = document.createElement('script');
-        script.src = `https://webapi.amap.com/maps?v=2.0&key=${AMAP_KEY}`;
-        script.onload = resolve;
-        script.onerror = reject;
-        document.head.appendChild(script);
-    });
-}
-
 window.onPuppyLoveReady(async () => {
     const now = new Date();
     document.getElementById('checkin-date').value = localDateValue(now);
@@ -616,7 +581,6 @@ window.onPuppyLoveReady(async () => {
         });
     }
     try {
-        await loadAmapScript();
         initMap();
     } catch (e) {
         console.error(e);
