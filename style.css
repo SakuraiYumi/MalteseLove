@@ -584,9 +584,22 @@ body:not(.puppylove-unlocked) .container {
     align-items: stretch;
 }
 
-.checkin-search-wrap .checkin-input {
-    flex: 1;
-    margin-bottom: 0;
+.checkin-search-hint {
+    margin: 0 0 8px 0;
+    font-size: 12px;
+    color: #888;
+}
+
+.checkin-place-tag {
+    font-style: normal;
+    font-size: 11px;
+    font-weight: bold;
+    color: #FF4D4D;
+    border: 1px solid #FF4D4D;
+    border-radius: 8px;
+    padding: 0 6px;
+    margin-left: 6px;
+    vertical-align: middle;
 }
 
 .checkin-search-results {
