@@ -759,6 +759,88 @@ body:not(.puppylove-unlocked) .container {
     grid-template-columns: repeat(3, 1fr) !important;
 }
 
+.food-revisit-hint {
+    margin: -8px 0 12px;
+    padding: 10px 12px;
+    background: #FFF0F2;
+    border: 2px dashed #FF879A;
+    border-radius: 12px;
+    font-size: 13px;
+    color: #555;
+    line-height: 1.4;
+}
+
+.food-shop-card {
+    overflow: hidden;
+    background: white;
+    padding: 0 !important;
+}
+
+.food-shop-head {
+    padding: 12px 12px 8px;
+}
+
+.food-avg-score {
+    margin: 0;
+    font-size: 13px;
+    font-weight: bold;
+    color: #E76F51;
+}
+
+.food-visit {
+    border-top: 2px solid #2D2D2D;
+    padding: 12px;
+    position: relative;
+}
+
+.food-visit-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    font-size: 12px;
+    color: #555;
+    margin-bottom: 8px;
+}
+
+.food-visit-photo {
+    width: 100%;
+    height: 150px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid #2D2D2D;
+    margin-bottom: 8px;
+}
+
+.food-visit-comment {
+    margin: 0 48px 0 0;
+    font-size: 14px;
+    color: #555;
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.food-visit-actions {
+    position: absolute;
+    right: 10px;
+    bottom: 10px;
+    display: flex;
+    gap: 5px;
+}
+
+.food-revisit-btn {
+    width: calc(100% - 24px);
+    margin: 0 12px 12px;
+    background: #FEE440;
+    color: #2D2D2D;
+    border: 2px solid #2D2D2D;
+    padding: 8px;
+    border-radius: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    font-family: inherit;
+    box-shadow: 3px 3px 0 #2D2D2D;
+}
+
 @media (max-width: 550px) {
     .checkin-map {
         height: 220px;

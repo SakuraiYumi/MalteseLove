@@ -229,6 +229,157 @@ if (addAnnBtn) {
 // ==================== 6. 美食探店功能 ====================
 const noImagePlaceholder = "https://i.pinimg.com/736x/84/4c/02/844c02c8639038d394ccb7af8e7b74ba.jpg";
 
+function escapeFood(text) {
+    return String(text || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+}
+
+function parseFoodItem(item) {
+    let name = '未命名记忆', rating = '', comment = '', tag = '🍽️ 未分类';
+    if (item.caption && item.caption.includes('||')) {
+        const parts = item.caption.split('||');
+        name = parts[0];
+        rating = parts[1] || '';
+        comment = parts[2] || '';
+        tag = parts[3] || '🍽️ 未分类';
+    } else {
+        comment = item.caption || '';
+    }
+    return {
+        ...item,
+        name,
+        rating,
+        comment,
+        tag,
+        location: item.location || '未知地点',
+        visit_date: item.visit_date || ''
+    };
+}
+
+function normalizeShopText(text) {
+    return String(text || '').trim().replace(/\s+/g, '').toLowerCase();
+}
+
+function shopKey(name, location) {
+    return `${normalizeShopText(name)}|${normalizeShopText(location)}`;
+}
+
+function ratingScore(rating) {
+    return (String(rating || '').match(/⭐/g) || []).length;
+}
+
+function averageScore(visits) {
+    const scores = visits.map((v) => ratingScore(v.rating)).filter((n) => n > 0);
+    if (!scores.length) return 0;
+    return scores.reduce((a, b) => a + b, 0) / scores.length;
+}
+
+function formatAvg(avg) {
+    return avg.toFixed(1).replace(/\.0$/, '');
+}
+
+function visitNumber(shop, item) {
+    const chrono = [...shop.visits].sort((a, b) => {
+        const dateCmp = String(a.visit_date || '').localeCompare(String(b.visit_date || ''));
+        return dateCmp !== 0 ? dateCmp : (a.id || 0) - (b.id || 0);
+    });
+    return chrono.findIndex((v) => v.id === item.id) + 1;
+}
+
+function groupFoodShops(items) {
+    const groups = new Map();
+    (items || []).forEach((raw) => {
+        const item = parseFoodItem(raw);
+        const key = shopKey(item.name, item.location);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(item);
+    });
+    const shops = [];
+    groups.forEach((visits) => {
+        visits.sort((a, b) => {
+            const dateCmp = String(b.visit_date || '').localeCompare(String(a.visit_date || ''));
+            return dateCmp !== 0 ? dateCmp : (b.id || 0) - (a.id || 0);
+        });
+        shops.push({
+            name: visits[0].name,
+            location: visits[0].location,
+            tag: visits[0].tag,
+            visits,
+            avg: averageScore(visits)
+        });
+    });
+    shops.sort((a, b) => (b.visits[0].id || 0) - (a.visits[0].id || 0));
+    return shops;
+}
+
+function fillShopNameList() {
+    const list = document.getElementById('food-shop-names');
+    if (!list) return;
+    const names = [...new Set(groupFoodShops(allFoods).map((shop) => shop.name))];
+    list.innerHTML = names.map((name) => `<option value="${escapeFood(name)}"></option>`).join('');
+}
+
+function findMatchingShop(name, location) {
+    const nameKey = normalizeShopText(name);
+    if (!nameKey) return null;
+    const shops = groupFoodShops(allFoods).filter((shop) => normalizeShopText(shop.name) === nameKey);
+    if (!shops.length) return null;
+    if (location) {
+        const locKey = normalizeShopText(location);
+        return shops.find((shop) => normalizeShopText(shop.location) === locKey) || null;
+    }
+    return shops[0];
+}
+
+window.updateRevisitHint = function () {
+    const hint = document.getElementById('food-revisit-hint');
+    const addBtn = document.getElementById('add-food-btn');
+    const editingId = document.getElementById('editing-id') ? document.getElementById('editing-id').value : '';
+    if (!hint) return;
+    if (editingId) {
+        hint.hidden = true;
+        return;
+    }
+    const nameInput = document.getElementById('food-input-name');
+    const locationInput = document.getElementById('food-input-location');
+    const name = nameInput ? nameInput.value.trim() : '';
+    const location = locationInput ? locationInput.value.trim() : '';
+    const shop = findMatchingShop(name, location);
+    if (!shop) {
+        hint.hidden = true;
+        if (addBtn) addBtn.innerText = '收录进美食局 🍔';
+        return;
+    }
+    const n = shop.visits.length;
+    hint.hidden = false;
+    hint.innerHTML = `这家店已经来过 <b>${n}</b> 次，平均 <b>${formatAvg(shop.avg)}</b> 星。这次会记成第 ${n + 1} 次，评价和照片都会另外存一份。`;
+    if (addBtn) addBtn.innerText = `记第 ${n + 1} 次探店 🍔`;
+};
+
+function maybeAutofillKnownShop() {
+    const editingId = document.getElementById('editing-id');
+    if (editingId && editingId.value) return;
+    const nameInput = document.getElementById('food-input-name');
+    const locationInput = document.getElementById('food-input-location');
+    const tagSelect = document.getElementById('food-input-tag');
+    if (!nameInput || !locationInput) return;
+    const shop = findMatchingShop(nameInput.value.trim(), locationInput.value.trim());
+    if (!shop) {
+        window.updateRevisitHint();
+        return;
+    }
+    if (!locationInput.value.trim() && shop.location && shop.location !== '未知地点') {
+        locationInput.value = shop.location;
+    }
+    if (tagSelect && shop.tag && [...tagSelect.options].some((o) => o.value === shop.tag)) {
+        tagSelect.value = shop.tag;
+    }
+    window.updateRevisitHint();
+}
+
 window.previewImage = function(input) {
     const previewContainer = document.getElementById('image-preview-container');
     const previewImage = document.getElementById('image-preview');
@@ -266,54 +417,65 @@ async function loadFoods() {
     const { data, error } = await supabaseClient.from('memories').select('id, url, caption, location, visit_date').order('id', { ascending: false });
     if (error) return console.error(error);
     allFoods = data || [];
+    const shops = groupFoodShops(allFoods);
     const countEl = document.getElementById('food-count');
-    if (countEl) countEl.innerText = allFoods.length;
+    if (countEl) countEl.innerText = shops.length;
+    const visitCountEl = document.getElementById('food-visit-count');
+    if (visitCountEl) visitCountEl.innerText = allFoods.length;
+    fillShopNameList();
     searchFood();
 }
 
-function renderFoodList(foodsArray) {
+function renderFoodList(shops) {
     const list = document.getElementById('food-list');
     if (!list) return;
     list.innerHTML = '';
-    if (foodsArray.length === 0) {
+    if (shops.length === 0) {
         list.innerHTML = '<p style="text-align:center; color:#999; width:100%; padding:20px;">🔍 没有找到相关的探店记录哦~</p>';
         return;
     }
-    foodsArray.forEach(item => {
-        let name = "未命名记忆", rating = "", comment = "", tag = "🍽️ 未分类";
-        if (item.caption && item.caption.includes('||')) {
-            const parts = item.caption.split('||');
-            name = parts[0];
-            rating = parts[1];
-            comment = parts[2] || '';
-            tag = parts[3] || '🍽️ 未分类';
-        } else {
-            comment = item.caption;
-        }
-        let location = item.location || '未知地点';
-        let showDate = item.visit_date || '未知日期';
+    shops.forEach((shop) => {
+        const latest = shop.visits[0];
+        const multi = shop.visits.length > 1;
+        const scoreLine = multi
+            ? `⭐ 平均 ${formatAvg(shop.avg)} 星 · 来过 ${shop.visits.length} 次`
+            : latest.rating;
+        const visitsHtml = shop.visits.map((item) => {
+            const nth = visitNumber(shop, item);
+            const photo = item.url
+                ? `<img src="${escapeFood(item.url)}" alt="第${nth}次照片" class="photo-main food-visit-photo" onerror="this.src='${noImagePlaceholder}'">`
+                : '';
+            return `
+                <div class="food-visit">
+                    <div class="food-visit-head">
+                        <span>第 ${nth} 次 · 📅 ${escapeFood(item.visit_date || '未知日期')}</span>
+                        <span>${escapeFood(item.rating)}</span>
+                    </div>
+                    ${photo}
+                    <p class="food-visit-comment">${escapeFood(item.comment)}</p>
+                    <div class="food-visit-actions">
+                        <button type="button" onclick="startEdit(${item.id})" style="background: #ECECEC; color: #2D2D2D; border: 2px solid #2D2D2D; padding: 2px 8px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">✏️</button>
+                        <button type="button" onclick="deleteItem('memories', ${item.id}, loadFoods)" style="background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 8px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">✖</button>
+                    </div>
+                </div>
+            `;
+        }).join('');
 
         const div = document.createElement('div');
-        div.className = "photo-card card box-shadow";
-        div.style.cssText = "display: flex; flex-direction: column; overflow: hidden; background: white; position: relative;";
+        div.className = 'photo-card card box-shadow food-shop-card';
         div.innerHTML = `
-            <img src="${item.url}" alt="美食照片" class="photo-main" style="width:100%; height:150px; object-fit:cover; border-bottom: 2px solid #2D2D2D;" onerror="this.src='${noImagePlaceholder}'">
-            <div style="padding: 12px; text-align: left; padding-bottom: 45px;">
-                <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-                    <h3 style="margin: 0 0 5px 0; color: #FF4D4D; font-size: 16px;">${name}</h3>
-                    <span style="background: #FFF0F2; color: #FF4D4D; padding: 2px 6px; border-radius: 8px; font-size: 10px; border: 1px solid #FF4D4D; white-space: nowrap;">${tag}</span>
+            <div class="food-shop-head">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px;">
+                    <h3 style="margin: 0 0 5px 0; color: #FF4D4D; font-size: 16px;">${escapeFood(shop.name)}</h3>
+                    <span style="background: #FFF0F2; color: #FF4D4D; padding: 2px 6px; border-radius: 8px; font-size: 10px; border: 1px solid #FF4D4D; white-space: nowrap;">${escapeFood(shop.tag)}</span>
                 </div>
-                <div style="display:flex; justify-content:space-between; font-size:12px; color:#555; margin-bottom: 5px;">
-                    <span>📍 ${location}</span>
-                    <span>📅 ${showDate}</span>
+                <div style="font-size:12px; color:#555; margin-bottom: 4px;">
+                    <span>📍 ${escapeFood(shop.location)}</span>
                 </div>
-                <p style="margin: 0 0 8px 0; font-size: 12px;">${rating}</p>
-                <p style="margin: 0; font-size: 14px; color: #555; line-height: 1.4; word-break: break-all;">${comment}</p>
-                <div style="position: absolute; right: 10px; bottom: 10px; display: flex; gap: 5px;">
-                    <button onclick="startEdit(${item.id})" style="background: #ECECEC; color: #2D2D2D; border: 2px solid #2D2D2D; padding: 2px 8px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">✏️</button>
-                    <button onclick="deleteItem('memories', ${item.id}, loadFoods)" style="background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 8px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">✖</button>
-                </div>
+                <p class="food-avg-score">${escapeFood(scoreLine)}</p>
             </div>
+            ${visitsHtml}
+            <button type="button" class="food-revisit-btn" onclick="revisitShop(${latest.id})">再探这家 🍔</button>
         `;
         list.appendChild(div);
     });
@@ -336,23 +498,17 @@ window.searchFood = function() {
     const ratingFilterEl = document.getElementById('search-rating');
     const ratingKeyword = ratingFilterEl ? ratingFilterEl.value : "All";
 
-    const filtered = allFoods.filter(item => {
-        let name = "未命名记忆", rating = "", comment = "", tag = "🍽️ 未分类";
-        if (item.caption && item.caption.includes('||')) {
-            const parts = item.caption.split('||');
-            name = parts[0];
-            rating = parts[1] || '';
-            comment = parts[2] || '';
-            tag = parts[3] || '🍽️ 未分类';
-        } else { comment = item.caption || ""; }
-        const location = item.location || '未知';
-        const visitDate = item.visit_date || '';
-
-        const matchesText = name.toLowerCase().includes(textKeyword) || comment.toLowerCase().includes(textKeyword) || location.toLowerCase().includes(textKeyword);
-        const matchesDate = !dateKeyword || (visitDate === dateKeyword);
-        const matchesTag = (currentSelectedTag === 'All') || (tag === currentSelectedTag);
-        const matchesRating = (ratingKeyword === 'All') || (rating.trim() === ratingKeyword.trim());
-
+    const filtered = groupFoodShops(allFoods).filter((shop) => {
+        const blob = [shop.name, shop.location, shop.tag, ...shop.visits.map((v) => `${v.comment} ${v.rating} ${v.visit_date}`)]
+            .join(' ')
+            .toLowerCase();
+        const matchesText = blob.includes(textKeyword);
+        const matchesDate = !dateKeyword || shop.visits.some((v) => v.visit_date === dateKeyword);
+        const matchesTag = currentSelectedTag === 'All' || shop.visits.some((v) => v.tag === currentSelectedTag);
+        const filterStars = ratingScore(ratingKeyword);
+        const matchesRating = ratingKeyword === 'All'
+            || Math.round(shop.avg) === filterStars
+            || shop.visits.some((v) => (v.rating || '').trim() === ratingKeyword.trim());
         return matchesText && matchesDate && matchesTag && matchesRating;
     });
     renderFoodList(filtered);
@@ -361,23 +517,19 @@ window.searchFood = function() {
 window.startEdit = function(id) {
     const item = allFoods.find(f => f.id == id);
     if (!item) return;
-    isImageRemoved = false; 
-    let name = "未命名记忆", rating = "⭐⭐⭐⭐微 绝赞推荐！", comment = item.caption, tag = "🍱 正餐饱腹";
-    if (item.caption && item.caption.includes('||')) {
-        const parts = item.caption.split('||');
-        name = parts[0]; rating = parts[1]; comment = parts[2] || ''; tag = parts[3] || '🍽️ 未分类';
-    }
+    isImageRemoved = false;
+    const parsed = parseFoodItem(item);
     document.getElementById("editing-id").value = item.id;
-    document.getElementById("food-input-name").value = name;
-    document.getElementById("food-input-location").value = item.location || "";
-    document.getElementById("food-input-rating").value = rating;
-    document.getElementById("food-input-comment").value = comment;
-    
+    document.getElementById("food-input-name").value = parsed.name;
+    document.getElementById("food-input-location").value = parsed.location === '未知地点' ? '' : parsed.location;
+    document.getElementById("food-input-rating").value = parsed.rating;
+    document.getElementById("food-input-comment").value = parsed.comment;
+
     const tagSelect = document.getElementById("food-input-tag");
-    if(tagSelect && ![...tagSelect.options].map(o => o.value).includes(tag)) {
-        tagSelect.innerHTML += `<option value="${tag}">${tag}</option>`;
+    if(tagSelect && ![...tagSelect.options].map(o => o.value).includes(parsed.tag)) {
+        tagSelect.innerHTML += `<option value="${escapeFood(parsed.tag)}">${escapeFood(parsed.tag)}</option>`;
     }
-    if (tagSelect) tagSelect.value = tag;
+    if (tagSelect) tagSelect.value = parsed.tag;
     if(item.visit_date) document.getElementById("food-input-date").value = item.visit_date;
 
     currentImageUrl = item.url;
@@ -388,12 +540,15 @@ window.startEdit = function(id) {
         previewImg.src = item.url; previewContainer.style.display = "block";
         if(removeBtn) removeBtn.style.display = 'block';
     }
+    const shop = groupFoodShops(allFoods).find((s) => shopKey(s.name, s.location) === shopKey(parsed.name, parsed.location));
+    const nth = shop ? visitNumber(shop, parsed) : 1;
     const formTitle = document.getElementById("form-title");
-    if (formTitle) { formTitle.innerHTML = `✏️ 正在修改：${name}`; formTitle.scrollIntoView({ behavior: 'smooth' }); }
+    if (formTitle) { formTitle.innerHTML = `✏️ 正在修改：${escapeFood(parsed.name)}（第 ${nth} 次）`; formTitle.scrollIntoView({ behavior: 'smooth' }); }
     const addBtn = document.getElementById("add-food-btn");
     if (addBtn) addBtn.innerText = "保存修改 💾";
     const cancelBtn = document.getElementById("cancel-edit-btn");
     if (cancelBtn) cancelBtn.style.display = "block";
+    window.updateRevisitHint();
 }
 
 window.resetForm = function() {
@@ -415,6 +570,25 @@ window.resetForm = function() {
     if (addBtn) addBtn.innerText = "收录进美食局 🍔";
     const cancelBtn = document.getElementById("cancel-edit-btn");
     if (cancelBtn) cancelBtn.style.display = "none";
+    window.updateRevisitHint();
+}
+
+window.revisitShop = function (id) {
+    const item = allFoods.find((f) => f.id == id);
+    if (!item) return;
+    resetForm();
+    const parsed = parseFoodItem(item);
+    document.getElementById('food-input-name').value = parsed.name;
+    document.getElementById('food-input-location').value = parsed.location === '未知地点' ? '' : parsed.location;
+    const tagSelect = document.getElementById('food-input-tag');
+    if (tagSelect && parsed.tag && [...tagSelect.options].some((o) => o.value === parsed.tag)) {
+        tagSelect.value = parsed.tag;
+    }
+    const formTitle = document.getElementById('form-title');
+    if (formTitle) formTitle.innerHTML = `🍔 再探：${escapeFood(parsed.name)}`;
+    window.updateRevisitHint();
+    const form = document.getElementById('form-title');
+    if (form) form.scrollIntoView({ behavior: 'smooth' });
 }
 
 const addFoodBtn = document.getElementById('add-food-btn');
@@ -465,16 +639,36 @@ if (addFoodBtn) {
                 await supabaseClient.from('memories').update(dbData).eq('id', editingId);
                 alert('🎉 修改成功！美食记录已悄悄更新！');
             } else {
+                const existed = findMatchingShop(name, location);
                 await supabaseClient.from('memories').insert([dbData]);
-                alert('🍔 成功收录进美食局！小狗奖励你一根骨头！');
+                if (existed) {
+                    const times = existed.visits.length + 1;
+                    const newAvg = averageScore([...existed.visits, { rating }]);
+                    alert(`🍔 第 ${times} 次探店已记下！现在平均 ${formatAvg(newAvg)} 星。`);
+                } else {
+                    alert('🍔 成功收录进美食局！小狗奖励你一根骨头！');
+                }
             }
             resetForm(); loadFoods();
         } catch (uploadError) {
             console.error(uploadError); alert('❌ 操作失败，请检查云端设置。');
         } finally {
-            addFoodBtn.innerText = "收录进美食局 🍔"; addFoodBtn.disabled = false;
+            addFoodBtn.disabled = false;
+            if (!document.getElementById('editing-id').value) window.updateRevisitHint();
+            else addFoodBtn.innerText = '保存修改 💾';
         }
     });
+}
+
+const foodNameInput = document.getElementById('food-input-name');
+const foodLocationInput = document.getElementById('food-input-location');
+if (foodNameInput) {
+    foodNameInput.addEventListener('input', window.updateRevisitHint);
+    foodNameInput.addEventListener('change', maybeAutofillKnownShop);
+    foodNameInput.addEventListener('blur', maybeAutofillKnownShop);
+}
+if (foodLocationInput) {
+    foodLocationInput.addEventListener('input', window.updateRevisitHint);
 }
 
 // ==================== 7. 心愿清单功能 ====================

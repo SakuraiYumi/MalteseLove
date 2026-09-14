@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小狗汪汪队 💖 美食探店局</title>
     <!-- 引入了统一的 CSS 文件 -->
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=9">
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -32,7 +32,7 @@
         <section class="card box-shadow" style="background: #FFF0F2; text-align: center; padding: 20px; border-radius: 20px;">
             <h2 style="margin: 0 0 5px 0; color: #FF4D4D;">🍔 美食探店局</h2>
             <p style="margin: 0; font-size: 16px; font-weight: bold; color: #555;">
-                ✨ 我们一共产粮打卡了 <span id="food-count" style="color: #FF4D4D; font-size: 22px;">0</span> 家秘密基地！
+                ✨ 我们一共产粮打卡了 <span id="food-count" style="color: #FF4D4D; font-size: 22px;">0</span> 家秘密基地，一共去了 <span id="food-visit-count" style="color: #FF4D4D; font-size: 22px;">0</span> 次！
             </p>
         </section>
 
@@ -74,7 +74,9 @@
             
             <input type="hidden" id="editing-id">
 
-            <input type="text" id="food-input-name" placeholder="🍔 输入店名 (如: 汪汪汉堡店)" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 15px; font-family: inherit; box-sizing: border-box;">
+            <input type="text" id="food-input-name" list="food-shop-names" placeholder="🍔 输入店名 (如: 汪汪汉堡店)" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 15px; font-family: inherit; box-sizing: border-box;" autocomplete="off">
+            <datalist id="food-shop-names"></datalist>
+            <p id="food-revisit-hint" class="food-revisit-hint" hidden></p>
             <input type="text" id="food-input-location" placeholder="📍 探店地点 (如: 夫子庙)" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 15px; font-family: inherit; box-sizing: border-box;">
             
             <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
@@ -121,8 +123,8 @@
         
     </div>
 
-    <script src="auth.js"></script>
-    <script src="script.js"></script>
+    <script src="auth.js?v=9"></script>
+    <script src="script.js?v=9"></script>
 
     <!-- 手机端双击放大图片的事件监听（保持在 HTML 底部即可） -->
     <script>
