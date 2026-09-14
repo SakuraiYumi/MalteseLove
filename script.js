@@ -784,7 +784,7 @@ window.loadRandomMemory = async function () {
     const pool = [];
     (diariesRes.data || []).forEach((item) => {
         const img = item.photo_url
-            ? `<img src="${escapeMem(item.photo_url)}" alt="日记" style="width:100%;border-radius:12px;border:2px solid #2D2D2D;margin-top:10px;">`
+            ? `<img src="${escapeMem(item.photo_url)}" alt="日记" class="memory-photo">`
             : '';
         pool.push({
             key: 'diary-' + item.id,
@@ -798,7 +798,7 @@ window.loadRandomMemory = async function () {
     (foodsRes.data || []).forEach((item) => {
         const parsed = parseFoodCaption(item);
         const img = item.url
-            ? `<img src="${item.url}" alt="探店" style="width:100%;border-radius:12px;border:2px solid #2D2D2D;margin-top:10px;">`
+            ? `<img src="${item.url}" alt="探店" class="memory-photo">`
             : '';
         pool.push({
             key: 'food-' + item.id,
@@ -820,7 +820,7 @@ window.loadRandomMemory = async function () {
     });
     (checkinsRes.data || []).forEach((item) => {
         const img = item.photo_url
-            ? `<img src="${escapeMem(item.photo_url)}" alt="打卡" style="width:100%;border-radius:12px;border:2px solid #2D2D2D;margin-top:10px;">`
+            ? `<img src="${escapeMem(item.photo_url)}" alt="打卡" class="memory-photo">`
             : '';
         const when = item.happen_at ? String(item.happen_at).slice(0, 10) : '';
         pool.push({

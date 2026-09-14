@@ -884,12 +884,29 @@ body:not(.puppylove-unlocked) .container {
 }
 
 .diary-entry-photo {
-    width: 100%;
-    max-height: 220px;
-    object-fit: cover;
+    display: block;
+    width: auto;
+    max-width: min(100%, 420px);
+    max-height: 360px;
+    height: auto;
+    object-fit: contain;
+    border-radius: 12px;
+    border: 2px solid #2D2D2D;
+    margin-top: 12px;
+    background: #FFF8F0;
+}
+
+.memory-photo {
+    display: block;
+    width: auto;
+    max-width: min(100%, 420px);
+    max-height: 320px;
+    height: auto;
+    object-fit: contain;
     border-radius: 12px;
     border: 2px solid #2D2D2D;
     margin-top: 10px;
+    background: #FFF8F0;
 }
 
 .on-this-day-year {
