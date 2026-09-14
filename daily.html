@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小狗的日常记录 🐾</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css?v=10">
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -26,6 +26,11 @@
             </div>
         </nav>
 
+        <section id="on-this-day" class="card box-shadow on-this-day" hidden>
+            <p class="section-title">📅 那年今日</p>
+            <div id="on-this-day-list"></div>
+        </section>
+
         <section class="card box-shadow">
             <p class="section-title">🐱 碎碎念日记流</p>
             
@@ -37,12 +42,21 @@
                 </div>
 
                 <textarea id="diary-input" placeholder="在这写下今天的可爱日常吧..." style="width: 100%; height: 80px; padding: 10px; border: 2px solid #2D2D2D; border-radius: 10px; font-family: inherit; resize: none;"></textarea>
+
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="file" id="diary-file" accept="image/*" style="display:none;" onchange="previewDiaryImage(this)">
+                    <label for="diary-file" class="diary-upload-label">📷 可选一张照片</label>
+                    <div id="diary-preview-box" class="diary-preview-box" hidden>
+                        <img id="diary-preview" alt="预览">
+                        <button type="button" onclick="clearDiaryImage()" class="diary-preview-clear">✖</button>
+                    </div>
+                </div>
                 
                 <!-- 🌟 按钮区域 -->
                 <div style="display: flex; gap: 10px;">
                     <button id="add-diary-btn-new" onclick="saveNewDaily()" style="flex: 1; background-color: #FF879A; color: white; border: 2px solid #2D2D2D; padding: 8px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; transition: all 0.2s;">丢进小狗日记本 🐾</button>
                     
-                    <button id="cancel-edit-btn" onclick="cancelEdit()" style="display: none; background-color: #F3F4F6; color: #555; border: 2px solid #2D2D2D; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D;">取消 🚫</button>
+                    <button type="button" id="cancel-edit-btn" onclick="cancelEdit()" style="display: none; background-color: #F3F4F6; color: #555; border: 2px solid #2D2D2D; padding: 8px 15px; border-radius: 20px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D;">取消 🚫</button>
                 </div>
             </div>
 
@@ -67,21 +81,111 @@
     </div>
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="auth.js"></script>
-    <script src="script.js"></script> 
+    <script src="auth.js?v=10"></script>
+    <script src="script.js?v=10"></script> 
     
     <script>
         let currentDailies = [];
-        let editingId = null; 
-        
+        let editingId = null;
+        let diaryPhotoFile = null;
+        let diaryPhotoUrl = '';
+        let diaryPhotoRemoved = false;
+
         // 🌟 分页相关的全局变量
         let currentPage = 1;
-        const itemsPerPage = 20; // 👈 这里控制每页显示多少条，可以随时改哦！
+        const itemsPerPage = 20;
         let totalItems = 0;
+
+        function escapeDaily(text) {
+            return String(text || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
+        }
+
+        function padDatePart(n) {
+            return String(n).padStart(2, '0');
+        }
+
+        function datePartsFromField(value) {
+            const raw = String(value || '').trim();
+            const day = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+            if (day && raw.indexOf('T') === -1) {
+                return { year: Number(day[1]), md: day[2] + '-' + day[3] };
+            }
+            const cn = raw.match(/(\d{4})年(\d{1,2})月(\d{1,2})/);
+            if (cn) {
+                return { year: Number(cn[1]), md: padDatePart(cn[2]) + '-' + padDatePart(cn[3]) };
+            }
+            const d = new Date(raw);
+            if (isNaN(d.getTime())) return null;
+            return {
+                year: d.getFullYear(),
+                md: padDatePart(d.getMonth() + 1) + '-' + padDatePart(d.getDate())
+            };
+        }
+
+        function todayMonthDay() {
+            const now = new Date();
+            return padDatePart(now.getMonth() + 1) + '-' + padDatePart(now.getDate());
+        }
+
+        function foodNameFromItem(item) {
+            if (typeof parseFoodItem === 'function') return parseFoodItem(item).name;
+            if (item.caption && item.caption.indexOf('||') !== -1) return item.caption.split('||')[0];
+            return item.caption || '探店';
+        }
+
+        function showDiaryPreview(src) {
+            const box = document.getElementById('diary-preview-box');
+            const img = document.getElementById('diary-preview');
+            if (!box || !img) return;
+            img.src = src;
+            box.hidden = false;
+        }
+
+        function hideDiaryPreview() {
+            const box = document.getElementById('diary-preview-box');
+            const img = document.getElementById('diary-preview');
+            const file = document.getElementById('diary-file');
+            if (box) box.hidden = true;
+            if (img) img.src = '';
+            if (file) file.value = '';
+        }
+
+        window.previewDiaryImage = function (input) {
+            const file = input.files && input.files[0];
+            if (!file) return;
+            diaryPhotoFile = file;
+            diaryPhotoRemoved = false;
+            const reader = new FileReader();
+            reader.onload = (e) => showDiaryPreview(e.target.result);
+            reader.readAsDataURL(file);
+        };
+
+        window.clearDiaryImage = function () {
+            diaryPhotoFile = null;
+            diaryPhotoUrl = '';
+            diaryPhotoRemoved = true;
+            hideDiaryPreview();
+        };
+
+        async function uploadDiaryPhoto(file) {
+            const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+            const fileName = `diary/${Date.now()}_${Math.random().toString(36).slice(2, 7)}.${ext}`;
+            const { error } = await supabaseClient.storage.from('Food').upload(fileName, file);
+            if (error) throw error;
+            const { data: { publicUrl } } = supabaseClient.storage.from('Food').getPublicUrl(fileName);
+            return publicUrl;
+        }
 
         document.getElementById('diary-date-input').value = new Date().toISOString().split('T')[0];
 
-        window.onPuppyLoveReady(loadDailies);
+        window.onPuppyLoveReady(() => {
+            loadDailies();
+            loadOnThisDay();
+        });
 
         // 🌟 当改变排序时，回到第一页再加载
         function onSortChange() {
@@ -140,18 +244,22 @@
             }
 
             // 渲染日记列表
-            listContainer.innerHTML = currentDailies.map(item => `
+            listContainer.innerHTML = currentDailies.map(item => {
+                const photo = item.photo_url
+                    ? `<img src="${escapeDaily(item.photo_url)}" alt="日记照片" class="diary-entry-photo">`
+                    : '';
+                return `
                 <div style="background: white; border: 2px solid #2D2D2D; border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 3px 3px 0 #2D2D2D; position: relative;">
-                    
                     <div style="position: absolute; right: 15px; top: 15px; display: flex; gap: 8px;">
                         <button onclick="startEdit(${item.id})" style="background: #E0F2FE; color: #0369A1; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">编辑 ✏️</button>
-                        <button onclick="deleteItem('diaries', ${item.id}, loadDailies)" style="background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">删除 ✖</button>
+                        <button onclick="deleteItem('diaries', ${item.id}, afterDiaryChange)" style="background: #FFE4E6; color: #FF4D4D; border: 2px solid #2D2D2D; padding: 2px 10px; border-radius: 12px; font-size: 12px; cursor: pointer; font-weight: bold;">删除 ✖</button>
                     </div>
-                    
-                    <p style="font-size: 13px; color: #888; margin: 0 0 8px 0; font-weight: bold;">📅 ${item.date || '无日期'}</p>
-                    <p style="margin: 0; color: #333; line-height: 1.5; white-space: pre-wrap; padding-right: 120px;">${item.text}</p>
+                    <p style="font-size: 13px; color: #888; margin: 0 0 8px 0; font-weight: bold;">📅 ${escapeDaily(item.date || '无日期')}</p>
+                    <p style="margin: 0; color: #333; line-height: 1.5; white-space: pre-wrap; padding-right: 120px;">${escapeDaily(item.text)}</p>
+                    ${photo}
                 </div>
-            `).join('');
+            `;
+            }).join('');
 
             updatePaginationUI();
         }
@@ -215,13 +323,18 @@
             document.getElementById('diary-input').value = item.text;
             document.getElementById('diary-date-input').value = item.date;
             editingId = id;
+            diaryPhotoFile = null;
+            diaryPhotoRemoved = false;
+            diaryPhotoUrl = item.photo_url || '';
+            if (diaryPhotoUrl) showDiaryPreview(diaryPhotoUrl);
+            else hideDiaryPreview();
 
             const mainBtn = document.getElementById('add-diary-btn-new');
             mainBtn.innerText = "保存修改 💾";
             mainBtn.style.backgroundColor = "#4ADE80"; 
 
             document.getElementById('cancel-edit-btn').style.display = "inline-block";
-            window.scrollTo({ top: 0, behavior: 'smooth' });
+            document.getElementById('diary-input').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
         // 🌟 取消编辑状态
@@ -229,6 +342,10 @@
             document.getElementById('diary-input').value = '';
             document.getElementById('diary-date-input').value = new Date().toISOString().split('T')[0];
             editingId = null;
+            diaryPhotoFile = null;
+            diaryPhotoUrl = '';
+            diaryPhotoRemoved = false;
+            hideDiaryPreview();
 
             const mainBtn = document.getElementById('add-diary-btn-new');
             mainBtn.innerText = "丢进小狗日记本 🐾";
@@ -237,42 +354,137 @@
             document.getElementById('cancel-edit-btn').style.display = "none";
         }
 
+        function afterDiaryChange() {
+            loadDailies();
+            loadOnThisDay();
+        }
+
         // 🌟 保存日记
         async function saveNewDaily() {
             if (typeof supabaseClient === 'undefined' || !supabaseClient) return alert("数据库还在连接，稍等一秒钟哦！");
 
             const content = document.getElementById('diary-input').value.trim();
             const diaryDate = document.getElementById('diary-date-input').value;
+            const btn = document.getElementById('add-diary-btn-new');
             
             if(!content) return alert("写点东西嘛汪！🐾");
+
+            let photoUrl = diaryPhotoUrl;
+            btn.disabled = true;
+            try {
+                if (diaryPhotoFile) {
+                    photoUrl = await uploadDiaryPhoto(diaryPhotoFile);
+                } else if (editingId && diaryPhotoRemoved) {
+                    photoUrl = null;
+                }
+
+                const payload = { text: content, date: diaryDate, photo_url: photoUrl || null };
             
-            if (editingId) {
-                const { error } = await supabaseClient
-                    .from('diaries')
-                    .update({ text: content, date: diaryDate })
-                    .eq('id', editingId);
-                
-                if (!error) {
-                    alert("修改成功啦！✨");
-                    cancelEdit(); 
-                    loadDailies(); // 停留在当前页刷新
+                if (editingId) {
+                    const { error } = await supabaseClient
+                        .from('diaries')
+                        .update(payload)
+                        .eq('id', editingId);
+                    
+                    if (!error) {
+                        alert("修改成功啦！✨");
+                        cancelEdit(); 
+                        afterDiaryChange();
+                    } else {
+                        alert(error.message && error.message.indexOf('photo_url') !== -1
+                            ? '还差一步：请在 Supabase SQL 里跑 supabase-setup.sql 最后那行（给日记加照片字段）。'
+                            : ('修改失败：' + error.message));
+                    }
                 } else {
-                    alert("修改失败：" + error.message);
+                    const { error } = await supabaseClient.from('diaries').insert([payload]);
+                    
+                    if(!error) {
+                        document.getElementById('diary-input').value = '';
+                        diaryPhotoFile = null;
+                        diaryPhotoUrl = '';
+                        diaryPhotoRemoved = false;
+                        hideDiaryPreview();
+                        currentPage = 1;
+                        afterDiaryChange();
+                        alert("丢进日记本成功啦！🎉");
+                    } else {
+                        alert(error.message && error.message.indexOf('photo_url') !== -1
+                            ? '还差一步：请在 Supabase SQL 里跑 supabase-setup.sql 最后那行（给日记加照片字段）。'
+                            : ('保存失败：' + error.message));
+                    }
                 }
-            } else {
-                const { error } = await supabaseClient.from('diaries').insert([
-                    { text: content, date: diaryDate }
-                ]);
-                
-                if(!error) {
-                    document.getElementById('diary-input').value = '';
-                    currentPage = 1; // 👈 发新日记后自动回到第一页，方便看最新日记
-                    loadDailies(); 
-                    alert("丢进日记本成功啦！🎉");
-                } else {
-                    alert("保存失败：" + error.message);
-                }
+            } catch (err) {
+                console.error(err);
+                alert('保存失败：' + (err.message || '请稍后再试'));
+            } finally {
+                btn.disabled = false;
             }
+        }
+
+        async function loadOnThisDay() {
+            const box = document.getElementById('on-this-day');
+            const list = document.getElementById('on-this-day-list');
+            if (!box || !list || !supabaseClient) return;
+            const md = todayMonthDay();
+            const thisYear = new Date().getFullYear();
+            const [dRes, fRes, cRes] = await Promise.all([
+                supabaseClient.from('diaries').select('*'),
+                supabaseClient.from('memories').select('*'),
+                supabaseClient.from('checkins').select('*').eq('status', 'done')
+            ]);
+            const pick = (rows, getDate) => (rows || []).filter((row) => {
+                const parts = datePartsFromField(getDate(row));
+                return parts && parts.md === md && parts.year < thisYear;
+            });
+            const diaries = pick(dRes.data, (row) => row.date);
+            const foods = pick(fRes.data, (row) => row.visit_date);
+            const checkins = pick(cRes.data, (row) => row.happen_at);
+            const years = [...new Set([
+                ...diaries.map((row) => datePartsFromField(row.date).year),
+                ...foods.map((row) => datePartsFromField(row.visit_date).year),
+                ...checkins.map((row) => datePartsFromField(row.happen_at).year)
+            ])].filter(Boolean).sort((a, b) => b - a);
+
+            if (!years.length) {
+                box.hidden = true;
+                list.innerHTML = '';
+                return;
+            }
+
+            box.hidden = false;
+            list.innerHTML = years.map((year) => {
+                const yearDiaries = diaries.filter((row) => datePartsFromField(row.date).year === year);
+                const yearFoods = foods.filter((row) => datePartsFromField(row.visit_date).year === year);
+                const yearCheckins = checkins.filter((row) => datePartsFromField(row.happen_at).year === year);
+                const diaryHtml = yearDiaries.map((item) => {
+                    const photo = item.photo_url
+                        ? `<img src="${escapeDaily(item.photo_url)}" alt="那年今日" class="diary-entry-photo">`
+                        : '';
+                    return `<div class="on-this-day-entry">
+                        <p class="on-this-day-text">${escapeDaily(item.text)}</p>
+                        ${photo}
+                    </div>`;
+                }).join('') || '<p class="on-this-day-text" style="color:#888;">那天没有写日记，但留下了出门的痕迹。</p>';
+                const bits = [];
+                yearFoods.forEach((item) => bits.push({
+                    kind: '探店',
+                    name: foodNameFromItem(item),
+                    href: `food.html?date=${year}-${md}`
+                }));
+                yearCheckins.forEach((item) => bits.push({
+                    kind: '打卡',
+                    name: item.place_name || '一个地点',
+                    href: `checkin.html?date=${year}-${md}`
+                }));
+                const extra = bits.length
+                    ? `<p class="on-this-day-extra">那天还去了 ${bits.map((bit) => `<a href="${bit.href}">${escapeDaily(bit.name)}</a>（${bit.kind}）`).join('、')}</p>`
+                    : '';
+                return `<div class="on-this-day-year">
+                    <p class="on-this-day-year-title">${year} 年的今天</p>
+                    ${diaryHtml}
+                    ${extra}
+                </div>`;
+            }).join('');
         }
     </script>
 </body>

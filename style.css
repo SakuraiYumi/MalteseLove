@@ -841,6 +841,139 @@ body:not(.puppylove-unlocked) .container {
     box-shadow: 3px 3px 0 #2D2D2D;
 }
 
+.diary-upload-label {
+    display: inline-block;
+    background: #FF879A;
+    color: white;
+    border: 2px solid #2D2D2D;
+    padding: 8px 14px;
+    border-radius: 15px;
+    font-weight: bold;
+    cursor: pointer;
+    box-shadow: 3px 3px 0 #2D2D2D;
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.diary-preview-box {
+    width: 56px;
+    height: 56px;
+    border: 2px solid #2D2D2D;
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.diary-preview-box img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.diary-preview-clear {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: rgba(255, 77, 77, 0.9);
+    color: white;
+    border: none;
+    padding: 0 5px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.diary-entry-photo {
+    width: 100%;
+    max-height: 220px;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 2px solid #2D2D2D;
+    margin-top: 10px;
+}
+
+.on-this-day-year {
+    border-top: 2px dashed #FF879A;
+    padding-top: 12px;
+    margin-top: 12px;
+}
+
+.on-this-day-year:first-child {
+    border-top: none;
+    padding-top: 0;
+    margin-top: 0;
+}
+
+.on-this-day-year-title {
+    margin: 0 0 8px;
+    font-weight: bold;
+    color: #E76F51;
+}
+
+.on-this-day-text {
+    margin: 0;
+    line-height: 1.5;
+    white-space: pre-wrap;
+}
+
+.on-this-day-extra {
+    margin: 10px 0 0;
+    font-size: 13px;
+    color: #555;
+    line-height: 1.5;
+}
+
+.on-this-day-extra a {
+    color: #FF4D4D;
+    font-weight: bold;
+}
+
+.wish-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 0;
+    position: relative;
+    overflow: visible;
+}
+
+.wish-row.is-done .wish-text {
+    color: #666;
+    text-decoration: line-through;
+}
+
+.wish-done-badge {
+    background: #DCFCE7;
+    border: 2px solid #2D2D2D;
+    border-radius: 10px;
+    padding: 1px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+}
+
+.wish-row.wish-burst {
+    animation: wish-bounce 0.4s ease;
+}
+
+.wish-spark {
+    position: absolute;
+    left: 18px;
+    top: 4px;
+    pointer-events: none;
+    z-index: 2;
+    animation: wish-pop 0.8s ease-out forwards;
+}
+
+@keyframes wish-bounce {
+    0%, 100% { transform: scale(1); }
+    40% { transform: scale(1.04); }
+}
+
+@keyframes wish-pop {
+    0% { transform: translate(0, 0) scale(0.4); opacity: 1; }
+    100% { transform: translate(var(--dx), var(--dy)) scale(1.15); opacity: 0; }
+}
+
 @media (max-width: 550px) {
     .checkin-map {
         height: 220px;

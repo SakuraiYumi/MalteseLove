@@ -423,6 +423,11 @@ async function loadFoods() {
     const visitCountEl = document.getElementById('food-visit-count');
     if (visitCountEl) visitCountEl.innerText = allFoods.length;
     fillShopNameList();
+    const dateParam = new URLSearchParams(location.search).get('date');
+    if (dateParam) {
+        const dateEl = document.getElementById('search-date');
+        if (dateEl) dateEl.value = dateParam;
+    }
     searchFood();
 }
 
@@ -684,18 +689,46 @@ async function loadWishes() {
     list.innerHTML = '';
     data.forEach(item => {
         const div = document.createElement('div');
-        div.style.cssText = "display: flex; align-items: center; justify-content: space-between; padding: 5px 0;";
-        const textColor = item.checked ? "#666" : "#333";
-        const textDecoration = item.checked ? "line-through" : "none"; 
-        div.innerHTML = `<label style="display: flex; align-items: center; cursor: pointer; color: ${textColor}; text-decoration: ${textDecoration}; flex: 1;"><input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleWish(${item.id}, ${item.checked})" style="transform: scale(1.3); margin-right: 10px; accent-color: #FF879A;"><span>${item.text}</span></label><button onclick="deleteItem('wishes', ${item.id}, loadWishes)" style="${deleteBtnStyle} float: none; margin-left: 10px;">删除 ✖</button>`;
+        div.className = 'wish-row' + (item.checked ? ' is-done' : '');
+        div.dataset.wishId = String(item.id);
+        const badge = item.checked ? '<span class="wish-done-badge">已完成</span>' : '';
+        div.innerHTML = `<label style="display: flex; align-items: center; cursor: pointer; flex: 1; gap: 8px;">
+            <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="toggleWish(${item.id}, ${item.checked})" style="transform: scale(1.3); accent-color: #FF879A;">
+            <span class="wish-text">${escapeMem(item.text)}</span>
+            ${badge}
+        </label><button onclick="deleteItem('wishes', ${item.id}, loadWishes)" style="${deleteBtnStyle} float: none; margin-left: 10px;">删除 ✖</button>`;
         list.appendChild(div);
     });
 }
 
+function playWishBurst(row) {
+    if (!row) return;
+    row.classList.add('wish-burst');
+    const marks = ['✨', '💖', '🐾', '⭐', '✨', '💖'];
+    marks.forEach((mark, i) => {
+        const spark = document.createElement('span');
+        spark.className = 'wish-spark';
+        spark.textContent = mark;
+        const angle = (Math.PI * 2 * i) / marks.length;
+        spark.style.setProperty('--dx', Math.cos(angle) * 36 + 'px');
+        spark.style.setProperty('--dy', (Math.sin(angle) * 28 - 12) + 'px');
+        row.appendChild(spark);
+        setTimeout(() => spark.remove(), 800);
+    });
+    setTimeout(() => row.classList.remove('wish-burst'), 800);
+}
+
 window.toggleWish = async function(id, currentStatus) {
     if (!supabaseClient) return;
-    await supabaseClient.from('wishes').update({ checked: !currentStatus }).eq('id', id);
-    loadWishes(); 
+    const turningOn = !currentStatus;
+    const row = document.querySelector(`[data-wish-id="${id}"]`);
+    await supabaseClient.from('wishes').update({ checked: turningOn }).eq('id', id);
+    if (turningOn) {
+        playWishBurst(row);
+        setTimeout(loadWishes, 720);
+    } else {
+        loadWishes();
+    }
 }
 const addWishBtn = document.getElementById('add-wish-btn');
 if (addWishBtn) {
@@ -741,20 +774,25 @@ window.loadRandomMemory = async function () {
     if (!card || !supabaseClient) return;
     card.innerHTML = '<p style="text-align:center;color:#888;">正在翻旧相册... 🐾</p>';
 
-    const [diariesRes, foodsRes, wishesRes] = await Promise.all([
+    const [diariesRes, foodsRes, wishesRes, checkinsRes] = await Promise.all([
         supabaseClient.from('diaries').select('*'),
         supabaseClient.from('memories').select('*'),
-        supabaseClient.from('wishes').select('*').eq('checked', true)
+        supabaseClient.from('wishes').select('*').eq('checked', true),
+        supabaseClient.from('checkins').select('*').eq('status', 'done')
     ]);
 
     const pool = [];
     (diariesRes.data || []).forEach((item) => {
+        const img = item.photo_url
+            ? `<img src="${escapeMem(item.photo_url)}" alt="日记" style="width:100%;border-radius:12px;border:2px solid #2D2D2D;margin-top:10px;">`
+            : '';
         pool.push({
             key: 'diary-' + item.id,
             kind: '日记',
             html: `<span class="memory-kind">📒 日记</span>
                 <p style="margin:0;color:#888;font-size:13px;">${escapeMem(item.date || '')}</p>
-                <p style="margin:8px 0 0;line-height:1.6;white-space:pre-wrap;">${escapeMem(item.text)}</p>`
+                <p style="margin:8px 0 0;line-height:1.6;white-space:pre-wrap;">${escapeMem(item.text)}</p>
+                ${img}`
         });
     });
     (foodsRes.data || []).forEach((item) => {
@@ -780,9 +818,24 @@ window.loadRandomMemory = async function () {
                 <p style="margin:8px 0 0;font-size:18px;line-height:1.5;">${escapeMem(item.text)}</p>`
         });
     });
+    (checkinsRes.data || []).forEach((item) => {
+        const img = item.photo_url
+            ? `<img src="${escapeMem(item.photo_url)}" alt="打卡" style="width:100%;border-radius:12px;border:2px solid #2D2D2D;margin-top:10px;">`
+            : '';
+        const when = item.happen_at ? String(item.happen_at).slice(0, 10) : '';
+        pool.push({
+            key: 'checkin-' + item.id,
+            kind: '打卡',
+            html: `<span class="memory-kind">📍 打卡</span>
+                <p style="margin:0;font-weight:bold;font-size:18px;">${escapeMem(item.place_name || '地图上的一个点')}</p>
+                <p style="margin:4px 0 0;color:#888;font-size:13px;">${escapeMem(item.category || '')} · ${escapeMem(when)}</p>
+                ${item.note ? `<p style="margin:8px 0 0;line-height:1.5;">${escapeMem(item.note)}</p>` : ''}
+                ${img}`
+        });
+    });
 
     if (pool.length === 0) {
-        card.innerHTML = '<p style="text-align:center;color:#888;">回忆盒还是空的，先去写日记、探店或勾上一个心愿吧 ✨</p>';
+        card.innerHTML = '<p style="text-align:center;color:#888;">回忆盒还是空的，先去写日记、探店、打卡或勾上一个心愿吧 ✨</p>';
         return;
     }
 

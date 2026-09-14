@@ -98,6 +98,5 @@ create policy "auth_update_food" on storage.objects
   using (bucket_id = 'Food')
   with check (bucket_id = 'Food');
 
-create policy "auth_delete_food" on storage.objects
-  for delete to authenticated
-  using (bucket_id = 'Food');
+-- 6) 日记可选配图（旧库升级时单独跑这一行也行）
+alter table public.diaries add column if not exists photo_url text;

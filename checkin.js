@@ -666,7 +666,7 @@ function renderCheckins() {
     const filtered = allCheckins.filter((item) => {
         const matchType = type === 'All' || item.category === type;
         const matchStatus = status === 'All' || item.status === status;
-        const happenDate = (item.happen_at || '').slice(0, 10);
+        const happenDate = item.happen_at ? localDateValue(new Date(item.happen_at)) : '';
         const matchDate = !date || happenDate === date;
         return matchType && matchStatus && matchDate;
     });
@@ -733,6 +733,11 @@ window.onPuppyLoveReady(async () => {
     } catch (e) {
         console.error(e);
         document.getElementById('checkin-map').innerHTML = '<p style="padding:20px;text-align:center;color:#888;">地图脚本加载失败</p>';
+    }
+    const dateParam = new URLSearchParams(location.search).get('date');
+    if (dateParam) {
+        const dateEl = document.getElementById('filter-date');
+        if (dateEl) dateEl.value = dateParam;
     }
     loadCheckins();
 });
