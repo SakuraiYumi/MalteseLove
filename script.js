@@ -774,11 +774,12 @@ window.loadRandomMemory = async function () {
     if (!card || !supabaseClient) return;
     card.innerHTML = '<p style="text-align:center;color:#888;">正在翻旧相册... 🐾</p>';
 
-    const [diariesRes, foodsRes, wishesRes, checkinsRes] = await Promise.all([
+    const [diariesRes, foodsRes, wishesRes, checkinsRes, hotelsRes] = await Promise.all([
         supabaseClient.from('diaries').select('*'),
         supabaseClient.from('memories').select('*'),
         supabaseClient.from('wishes').select('*').eq('checked', true),
-        supabaseClient.from('checkins').select('*').eq('status', 'done')
+        supabaseClient.from('checkins').select('*').eq('status', 'done'),
+        supabaseClient.from('hotels').select('*')
     ]);
 
     const pool = [];
@@ -833,9 +834,25 @@ window.loadRandomMemory = async function () {
                 ${img}`
         });
     });
+    if (!hotelsRes.error) {
+        (hotelsRes.data || []).forEach((item) => {
+            const img = item.photo_url
+                ? `<img src="${escapeMem(item.photo_url)}" alt="酒店" class="memory-photo">`
+                : '';
+            pool.push({
+                key: 'hotel-' + item.id,
+                kind: '酒店',
+                html: `<span class="memory-kind">🏨 酒店</span>
+                    <p style="margin:0;font-weight:bold;font-size:18px;">${escapeMem(item.name || '未命名酒店')}</p>
+                    <p style="margin:4px 0 0;color:#888;font-size:13px;">📍 ${escapeMem(item.location || '')} · ${escapeMem(item.visit_date || '')}</p>
+                    <p style="margin:8px 0 0;line-height:1.5;">${escapeMem(item.comment || '')}</p>
+                    ${img}`
+            });
+        });
+    }
 
     if (pool.length === 0) {
-        card.innerHTML = '<p style="text-align:center;color:#888;">回忆盒还是空的，先去写日记、探店、打卡或勾上一个心愿吧 ✨</p>';
+        card.innerHTML = '<p style="text-align:center;color:#888;">回忆盒还是空的，先去写日记、探店、住酒店、打卡或勾上一个心愿吧 ✨</p>';
         return;
     }
 

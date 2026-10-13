@@ -883,7 +883,8 @@ body:not(.puppylove-unlocked) .container {
     font-weight: bold;
 }
 
-.diary-entry-photo {
+.diary-entry-photo,
+.hotel-stay-photo {
     display: block;
     width: auto;
     max-width: min(100%, 420px);

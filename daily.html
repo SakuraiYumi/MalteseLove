@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小狗的日常记录 🐾</title>
-    <link rel="stylesheet" href="style.css?v=11">
+    <link rel="stylesheet" href="style.css?v=12">
     <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
 </head>
 <body>
@@ -21,6 +21,7 @@
                 <a href="anniversary.html" class="nav-btn">纪念日</a>
                 <a href="wish.html" class="nav-btn">心愿</a>
                 <a href="food.html" class="nav-btn">美食</a>
+                <a href="hotel.html" class="nav-btn">酒店</a>
                 <a href="checkin.html" class="nav-btn">打卡</a>
                 <a href="note.html" class="nav-btn">便签</a> 
             </div>
@@ -82,7 +83,7 @@
     
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="auth.js?v=10"></script>
-    <script src="script.js?v=11"></script> 
+    <script src="script.js?v=12"></script> 
     
     <script>
         let currentDailies = [];
@@ -427,10 +428,11 @@
             if (!box || !list || !supabaseClient) return;
             const md = todayMonthDay();
             const thisYear = new Date().getFullYear();
-            const [dRes, fRes, cRes] = await Promise.all([
+            const [dRes, fRes, cRes, hRes] = await Promise.all([
                 supabaseClient.from('diaries').select('*'),
                 supabaseClient.from('memories').select('*'),
-                supabaseClient.from('checkins').select('*').eq('status', 'done')
+                supabaseClient.from('checkins').select('*').eq('status', 'done'),
+                supabaseClient.from('hotels').select('*')
             ]);
             const pick = (rows, getDate) => (rows || []).filter((row) => {
                 const parts = datePartsFromField(getDate(row));
@@ -439,10 +441,12 @@
             const diaries = pick(dRes.data, (row) => row.date);
             const foods = pick(fRes.data, (row) => row.visit_date);
             const checkins = pick(cRes.data, (row) => row.happen_at);
+            const hotels = hRes.error ? [] : pick(hRes.data, (row) => row.visit_date);
             const years = [...new Set([
                 ...diaries.map((row) => datePartsFromField(row.date).year),
                 ...foods.map((row) => datePartsFromField(row.visit_date).year),
-                ...checkins.map((row) => datePartsFromField(row.happen_at).year)
+                ...checkins.map((row) => datePartsFromField(row.happen_at).year),
+                ...hotels.map((row) => datePartsFromField(row.visit_date).year)
             ])].filter(Boolean).sort((a, b) => b - a);
 
             if (!years.length) {
@@ -456,6 +460,7 @@
                 const yearDiaries = diaries.filter((row) => datePartsFromField(row.date).year === year);
                 const yearFoods = foods.filter((row) => datePartsFromField(row.visit_date).year === year);
                 const yearCheckins = checkins.filter((row) => datePartsFromField(row.happen_at).year === year);
+                const yearHotels = hotels.filter((row) => datePartsFromField(row.visit_date).year === year);
                 const diaryHtml = yearDiaries.map((item) => {
                     const photo = item.photo_url
                         ? `<img src="${escapeDaily(item.photo_url)}" alt="那年今日" class="diary-entry-photo">`
@@ -479,10 +484,14 @@
                 const extra = bits.length
                     ? `<p class="on-this-day-extra">那天还去了 ${bits.map((bit) => `<a href="${bit.href}">${escapeDaily(bit.name)}</a>（${bit.kind}）`).join('、')}</p>`
                     : '';
+                const stay = yearHotels.length
+                    ? `<p class="on-this-day-extra">那天还住了 ${yearHotels.map((item) => `<a href="hotel.html?date=${year}-${md}">${escapeDaily(item.name || '一家酒店')}</a>`).join('、')}</p>`
+                    : '';
                 return `<div class="on-this-day-year">
                     <p class="on-this-day-year-title">${year} 年的今天</p>
                     ${diaryHtml}
                     ${extra}
+                    ${stay}
                 </div>`;
             }).join('');
         }

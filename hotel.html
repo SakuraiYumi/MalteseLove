@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小狗汪汪队 💖 酒店探店</title>
+    <link rel="stylesheet" href="style.css?v=12">
+    <link href="https://fonts.googleapis.com/css2?family=ZCOOL+KuaiLe&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav-bar">
+            <div class="user-avatars-small">
+                <img src="https://i.pinimg.com/736x/1e/c6/4c/1ec64c28cbce99261f09741f21722619.jpg" alt="小狗 A" class="avatar-small">
+                <img src="https://i.pinimg.com/736x/ab/e5/4b/abe54be077392cc5792ba49568955c56.jpg" alt="小狗 B" class="avatar-small">
+            </div>
+            <div class="nav-links">
+                <a href="index.html" class="nav-btn">首页</a>
+                <a href="daily.html" class="nav-btn">日常</a>
+                <a href="anniversary.html" class="nav-btn">纪念日</a>
+                <a href="wish.html" class="nav-btn">心愿</a>
+                <a href="food.html" class="nav-btn">美食</a>
+                <a href="hotel.html" class="nav-btn active">酒店</a>
+                <a href="checkin.html" class="nav-btn">打卡</a>
+                <a href="note.html" class="nav-btn">便签</a>
+            </div>
+        </nav>
+
+        <section class="card box-shadow" style="background: #FFF0F2; text-align: center; padding: 20px; border-radius: 20px;">
+            <h2 style="margin: 0 0 5px 0; color: #FF4D4D;">🏨 酒店探店局</h2>
+            <p style="margin: 0; font-size: 16px; font-weight: bold; color: #555;">
+                ✨ 我们一共住过 <span id="hotel-count" style="color: #FF4D4D; font-size: 22px;">0</span> 家，一共住了 <span id="hotel-visit-count" style="color: #FF4D4D; font-size: 22px;">0</span> 次！
+            </p>
+        </section>
+
+        <section class="card box-shadow" style="padding: 20px; border-radius: 20px;">
+            <input type="text" id="search-hotel" placeholder="🔍 搜酒店名、地点、或者评价..." style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 12px; font-family: inherit; box-sizing: border-box;">
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 12px; flex-wrap: wrap;">
+                <div style="display: flex; gap: 5px; align-items: center; flex: 1; min-width: 140px;">
+                    <span style="font-size: 14px; font-weight: bold; white-space: nowrap;">📅 日期:</span>
+                    <input type="date" id="search-hotel-date" style="width: 100%; padding: 8px; border-radius: 10px; border: 2px solid #2D2D2D; font-family: inherit; box-sizing: border-box;">
+                </div>
+                <div style="display: flex; gap: 5px; align-items: center; flex: 1; min-width: 140px;">
+                    <span style="font-size: 14px; font-weight: bold; white-space: nowrap;">⭐ 评分:</span>
+                    <select id="search-hotel-rating" style="width: 100%; padding: 8px; border-radius: 10px; border: 2px solid #2D2D2D; font-family: inherit; background: white; cursor: pointer; box-sizing: border-box;">
+                        <option value="All">全部评分</option>
+                        <option value="⭐⭐⭐⭐⭐ 夯">⭐⭐⭐⭐⭐ 夯</option>
+                        <option value="⭐⭐⭐⭐ 顶级">⭐⭐⭐⭐ 顶级</option>
+                        <option value="⭐⭐⭐ 人上人">⭐⭐⭐ 人上人</option>
+                        <option value="⭐⭐ NPC">⭐⭐ NPC</option>
+                        <option value="⭐ 拉完了">⭐ 拉完了</option>
+                    </select>
+                </div>
+            </div>
+            <div id="hotel-tag-filters" style="display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; white-space: nowrap; -webkit-overflow-scrolling: touch;">
+                <button type="button" class="hotel-tag-btn" data-tag="All" style="background: #FF4D4D; color: white; border: 2px solid #2D2D2D; padding: 4px 12px; border-radius: 15px; font-size: 13px; cursor: pointer; font-weight: bold; font-family: inherit;">全部标签</button>
+                <button type="button" class="hotel-tag-btn" data-tag="🏨 酒店" style="background: white; color: #2D2D2D; border: 2px solid #2D2D2D; padding: 4px 12px; border-radius: 15px; font-size: 13px; cursor: pointer; font-weight: bold; font-family: inherit;">🏨 酒店</button>
+                <button type="button" class="hotel-tag-btn" data-tag="🏡 民宿" style="background: white; color: #2D2D2D; border: 2px solid #2D2D2D; padding: 4px 12px; border-radius: 15px; font-size: 13px; cursor: pointer; font-weight: bold; font-family: inherit;">🏡 民宿</button>
+                <button type="button" class="hotel-tag-btn" data-tag="🎒 青旅" style="background: white; color: #2D2D2D; border: 2px solid #2D2D2D; padding: 4px 12px; border-radius: 15px; font-size: 13px; cursor: pointer; font-weight: bold; font-family: inherit;">🎒 青旅</button>
+                <button type="button" class="hotel-tag-btn" data-tag="🏝️ 度假村" style="background: white; color: #2D2D2D; border: 2px solid #2D2D2D; padding: 4px 12px; border-radius: 15px; font-size: 13px; cursor: pointer; font-weight: bold; font-family: inherit;">🏝️ 度假村</button>
+            </div>
+        </section>
+
+        <section class="card box-shadow" style="background: #FFFDF4; padding: 20px; border-radius: 20px;">
+            <h3 id="hotel-form-title" style="margin: 0 0 15px 0; color: #2D2D2D;">🏨 记录新入住</h3>
+            <input type="hidden" id="hotel-editing-id">
+            <input type="text" id="hotel-input-name" list="hotel-names" placeholder="🏨 酒店名 (如: 汪汪旅馆)" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 15px; font-family: inherit; box-sizing: border-box;" autocomplete="off">
+            <datalist id="hotel-names"></datalist>
+            <p id="hotel-revisit-hint" class="food-revisit-hint" hidden></p>
+            <input type="text" id="hotel-input-location" placeholder="📍 地点 (如: 杭州西湖)" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 15px; font-family: inherit; box-sizing: border-box;">
+            <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
+                <span style="font-weight: bold; font-size: 14px; white-space: nowrap;">📅 入住日期:</span>
+                <input type="date" id="hotel-input-date" style="flex: 1; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; font-family: inherit; box-sizing: border-box;">
+            </div>
+            <select id="hotel-input-tag" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 15px; font-family: inherit; box-sizing: border-box; background: white; cursor: pointer;">
+                <option value="🏨 酒店">🏨 酒店</option>
+                <option value="🏡 民宿">🏡 民宿</option>
+                <option value="🎒 青旅">🎒 青旅</option>
+                <option value="🏝️ 度假村">🏝️ 度假村</option>
+                <option value="🛏️ 其他">🛏️ 其他</option>
+            </select>
+            <select id="hotel-input-rating" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 15px; font-family: inherit; box-sizing: border-box; background: white; cursor: pointer;">
+                <option value="⭐⭐⭐⭐⭐ 夯">⭐⭐⭐⭐⭐ 夯</option>
+                <option value="⭐⭐⭐⭐ 顶级">⭐⭐⭐⭐ 顶级</option>
+                <option value="⭐⭐⭐ 人上人">⭐⭐⭐ 人上人</option>
+                <option value="⭐⭐ NPC">⭐⭐ NPC</option>
+                <option value="⭐ 拉完了">⭐ 拉完了</option>
+            </select>
+            <textarea id="hotel-input-comment" placeholder="💬 留下入住评价（比如：枕头很软，窗外能看到河…）" rows="3" style="width: 100%; padding: 10px; border-radius: 12px; border: 2px solid #2D2D2D; margin-bottom: 15px; font-family: inherit; box-sizing: border-box; resize: none;"></textarea>
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 15px;">
+                <input type="file" id="hotel-input-file" accept="image/*" style="display: none;">
+                <label for="hotel-input-file" style="background-color: #FF879A; color: white; border: 2px solid #2D2D2D; padding: 10px 20px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; font-size: 14px; white-space: nowrap; font-family: inherit;">📷 上传/修改照片</label>
+                <div id="hotel-preview-box" style="display: none; width: 60px; height: 60px; border: 2px solid #2D2D2D; border-radius: 10px; overflow: hidden; background: white; position: relative;">
+                    <img id="hotel-preview" src="" alt="预览" style="width: 100%; height: 100%; object-fit: cover;">
+                    <button type="button" id="hotel-remove-img" style="display: none; position: absolute; top: 0; right: 0; background: rgba(255, 77, 77, 0.9); color: white; border: none; padding: 0 5px; font-size: 10px; cursor: pointer; border-radius: 0 0 0 8px; font-weight: bold;">✖</button>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px;">
+                <button type="button" id="add-hotel-btn" style="flex: 2; background-color: #FEE440; color: #2D2D2D; border: 3px solid #2D2D2D; padding: 12px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; font-family: inherit; font-size: 15px;">收录进酒店局 🏨</button>
+                <button type="button" id="hotel-cancel-btn" style="display: none; flex: 1; background-color: #ECECEC; color: #2D2D2D; border: 3px solid #2D2D2D; padding: 12px; border-radius: 15px; font-weight: bold; cursor: pointer; box-shadow: 3px 3px 0 #2D2D2D; font-family: inherit; font-size: 15px;">取消</button>
+            </div>
+        </section>
+
+        <section id="hotel-list" class="photo-stream-section links-grid-photos" style="width:100%; display: grid; gap: 15px;"></section>
+    </div>
+
+    <script src="auth.js?v=12"></script>
+    <script src="script.js?v=12"></script>
+    <script src="hotel.js?v=12"></script>
+</body>
+</html>

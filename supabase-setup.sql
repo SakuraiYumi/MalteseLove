@@ -100,3 +100,26 @@ create policy "auth_update_food" on storage.objects
 
 -- 6) 日记可选配图（旧库升级时单独跑这一行也行）
 alter table public.diaries add column if not exists photo_url text;
+
+-- 7) 酒店探店。旧库升级时，从这一段跑到文件末尾即可。
+create table if not exists public.hotels (
+  id bigint generated always as identity primary key,
+  name text not null default '',
+  location text not null default '',
+  visit_date date,
+  tag text not null default '🏨 酒店',
+  rating text not null default '',
+  comment text not null default '',
+  photo_url text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.hotels enable row level security;
+
+drop policy if exists "authenticated_all_hotels" on public.hotels;
+create policy "authenticated_all_hotels" on public.hotels
+  for all to authenticated using (true) with check (true);
+
+revoke all on public.hotels from anon, public;
+grant all on public.hotels to authenticated;
+grant usage, select on all sequences in schema public to authenticated;
